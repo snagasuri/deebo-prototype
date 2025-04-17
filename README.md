@@ -4,6 +4,8 @@ Deebo is an autonomous debugging system that works alongside AI coding agents (C
 
 Here's [an example of Deebo solving the test53 linearizer failure $100 tinygrad bug bounty](https://github.com/snagasuri/deebo-prototype/tree/master/memory-bank/9bd38e9840d3/sessions/session-1744006973678) by spawning 17 scenario agents and coming up with 2 valid fixes. Check out [progress.md](https://github.com/snagasuri/deebo-prototype/blob/master/memory-bank/9bd38e9840d3/progress.md) for just the solution.
 
+**any questions/problems with installing? DM me on Twitter: [@sriramenn](https://twitter.com/sriramenn)**
+
 ## 🚀 Quick Install (for Cline/Claude Desktop users)
 
 ```bash
@@ -27,8 +29,6 @@ This allows you to:
 You can use different providers for Mother and Scenario agents. For example:
 - Mother Agent: Anthropic with claude-3-sonnet
 - Scenario Agents: OpenRouter with claude-3.5-sonnet
-
-Need help? DM me on Twitter: [@sriramenn](https://twitter.com/sriramenn)
 
 <details>
 <summary>🔍 What exactly does Deebo do?</summary>

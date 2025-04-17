@@ -19,7 +19,29 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
 
   const connectionPromise = (async () => {
     const config = JSON.parse(await readFile(join(DEEBO_ROOT, 'config', 'tools.json'), 'utf-8'));
-    const toolConfig = { ...config.tools[toolName] };
+    let toolConfig = { ...config.tools[toolName] };
+    
+    // Check if we should use Windows fallback
+    const isWindows = process.platform === 'win32';
+    if (isWindows && toolConfig.windowsFallback) {
+      // First try to check if the primary tool is available
+      try {
+        // Just check if uvx exists for git-mcp
+        if (toolName === 'git-mcp' && !process.env.DEEBO_UVX_PATH) {
+          // Try to find uvx in PATH
+          const { execSync } = await import('child_process');
+          try {
+            execSync('uvx --version', { stdio: 'ignore' });
+          } catch {
+            console.log(`Using windowsFallback for ${toolName} because uvx is not available`);
+            toolConfig = { ...toolConfig.windowsFallback };
+          }
+        }
+      } catch (error) {
+        console.log(`Error checking for primary tool, using windowsFallback: ${error}`);
+        toolConfig = { ...toolConfig.windowsFallback };
+      }
+    }
 
     // Build paths for placeholder replacement
     const projectId = getProjectId(repoPath);

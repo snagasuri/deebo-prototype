@@ -11,6 +11,23 @@ npx deebo-setup
 ```
 That's it! Follow the prompts to configure your API key and you're ready to go.
 
+### Managing Providers
+
+After installation, you can manage your LLM providers using:
+
+```bash
+npx deebo-setup providers
+```
+
+This allows you to:
+- Configure Mother Agent (provider, model, API key)
+- Configure Scenario Agent (provider, model, API key)
+- Remove Provider
+
+You can use different providers for Mother and Scenario agents. For example:
+- Mother Agent: Anthropic with claude-3-sonnet
+- Scenario Agents: OpenRouter with claude-3.5-sonnet
+
 Need help? DM me on Twitter: [@sriramenn](https://twitter.com/sriramenn)
 
 <details>

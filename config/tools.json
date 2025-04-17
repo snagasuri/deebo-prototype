@@ -12,7 +12,16 @@
         "mcp-server-git",
         "--repository",
         "{repoPath}"
-      ]
+      ],
+      "windowsFallback": {
+        "command": "python",
+        "args": [
+          "-m",
+          "mcp_server_git",
+          "--repository",
+          "{repoPath}"
+        ]
+      }
     }
   }
 }

@@ -13,8 +13,61 @@ import { promisify } from 'util';
 
 // Function to find tool paths during initialization
 async function findToolPaths() {
-  const npxPath = (await execPromise('which npx')).stdout.trim();
-  const uvxPath = (await execPromise('which uvx')).stdout.trim();
+  // Use 'where' on Windows, 'which' on other platforms
+  const isWindows = process.platform === 'win32';
+  const findCommand = isWindows ? 'where' : 'which';
+  
+  let npxPath = '';
+  let uvxPath = '';
+  
+  try {
+    // Find npx path
+    try {
+      npxPath = (await execPromise(`${findCommand} npx`)).stdout.trim();
+      if (isWindows && npxPath.includes('\r\n')) {
+        // Windows 'where' can return multiple lines, take the first one
+        npxPath = npxPath.split('\r\n')[0].trim();
+      }
+    } catch (error) {
+      // Fallback for Windows if 'where' fails
+      if (isWindows) {
+        npxPath = 'npx';
+        console.log('Using default npx command');
+      } else {
+        throw error;
+      }
+    }
+    
+    // Find uvx path
+    try {
+      uvxPath = (await execPromise(`${findCommand} uvx`)).stdout.trim();
+      if (isWindows && uvxPath.includes('\r\n')) {
+        // Windows 'where' can return multiple lines, take the first one
+        uvxPath = uvxPath.split('\r\n')[0].trim();
+      }
+    } catch (error) {
+      // On Windows, we may need to fallback to Python module path
+      if (isWindows) {
+        try {
+          // Check if uv is installed via pip
+          await execPromise('pip show uv');
+          uvxPath = 'python -m uv'; // Use Python module path
+          console.log('Using Python module path for uv');
+        } catch (pipError) {
+          // If neither found, use default (which will be handled by the fallback in mcp.ts)
+          uvxPath = 'uvx';
+          console.log('Using default uvx command');
+        }
+      } else {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error finding tool paths:', error);
+    // Set fallback values if we can't determine paths
+    if (!npxPath) npxPath = 'npx';
+    if (!uvxPath) uvxPath = 'uvx';
+  }
 
   // Store paths in env for mcp.ts to use
   process.env.DEEBO_NPX_PATH = npxPath;
@@ -29,7 +82,16 @@ async function findToolPaths() {
       },
       "git-mcp": {
         command: "{uvxPath}",
-        args: ["mcp-server-git", "--repository", "{repoPath}"]
+        args: ["mcp-server-git", "--repository", "{repoPath}"],
+        windowsFallback: {
+          command: "python",
+          args: [
+            "-m",
+            "mcp_server_git",
+            "--repository",
+            "{repoPath}"
+          ]
+        }
       }
     }
   };

@@ -4,7 +4,7 @@ Deebo is an autonomous debugging system that works alongside AI coding agents (C
 
 Deebo is basically your coding agent's best friend and teammate. You can offload tricky bugs or even sub-tasks that Deebo groks while you continue working on your main task. 
 
-Here's [an example of Deebo solving the test53 linearizer failure $100 tinygrad bug bounty](https://github.com/snagasuri/deebo-prototype/tree/master/memory-bank/9bd38e9840d3/sessions/session-1744006973678) by spawning 17 scenario agents and coming up with 2 valid fixes. Check out [progress.md](https://github.com/snagasuri/deebo-prototype/blob/master/memory-bank/9bd38e9840d3/progress.md) for just the solution.
+Here's [an example of Deebo grokking the test53 linearizer failure $100 tinygrad bug bounty](https://github.com/snagasuri/deebo-prototype/tree/master/memory-bank/9bd38e9840d3/sessions/session-1744006973678) by spawning 17 scenario agents and coming up with 2 valid fixes. Check out [progress.md](https://github.com/snagasuri/deebo-prototype/blob/master/memory-bank/9bd38e9840d3/progress.md) for just the solution.
 
 **any questions/problems with installing? DM me on Twitter: [@sriramenn](https://twitter.com/sriramenn)**
 

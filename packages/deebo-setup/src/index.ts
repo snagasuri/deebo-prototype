@@ -23,8 +23,8 @@ async function main() {
     // Get Mother agent configuration
     const defaultModels: Record<string, string> = {
       openrouter: 'anthropic/claude-3.5-sonnet',
-      anthropic: 'claude-3-sonnet-20240229',
-      gemini: 'gemini-1.5-pro'
+      anthropic: 'claude-3-5-sonnet-20241022',
+      gemini: 'gemini-2.5-pro-preview-03-25'
     };
 
     // Get Mother agent configuration
@@ -40,7 +40,7 @@ async function main() {
     const { motherModel } = await inquirer.prompt([{
       type: 'input',
       name: 'motherModel',
-      message: `Enter model for Mother agent (press Enter for ${defaultModels[parsedMotherHost]}):`,
+      message: chalk.dim(`Enter model (default is ${defaultModels[parsedMotherHost].split('/').pop()})`),
       default: defaultModels[parsedMotherHost]
     }]);
 
@@ -48,7 +48,7 @@ async function main() {
     const { scenarioHost } = await inquirer.prompt([{
       type: 'list',
       name: 'scenarioHost',
-      message: 'Choose LLM host for Scenario agents (press Enter to use same as Mother):',
+      message: 'Choose LLM host for Scenario agents:',
       choices: Object.keys(defaultModels),
       default: parsedMotherHost
     }]);
@@ -58,7 +58,7 @@ async function main() {
     const { scenarioModel } = await inquirer.prompt([{
       type: 'input',
       name: 'scenarioModel',
-      message: `Enter model for Scenario agents (press Enter for ${defaultModels[parsedScenarioHost]}):`,
+      message: chalk.dim(`Enter model (default is ${defaultModels[parsedScenarioHost].split('/').pop()})`),
       default: defaultModels[parsedScenarioHost]
     }]);
 

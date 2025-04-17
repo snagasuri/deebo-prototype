@@ -7,7 +7,7 @@ Here's [an example of Deebo solving the test53 linearizer failure $100 tinygrad 
 ## 🚀 Quick Install (for Cline/Claude Desktop users)
 
 ```bash
-npx deebo-setup
+npx deebo-setup@latest
 ```
 That's it! Follow the prompts to configure your API key and you're ready to go.
 

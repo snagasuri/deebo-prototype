@@ -65,7 +65,7 @@ You can use different providers for Mother and Scenario agents. For example:
 - Mother Agent: Anthropic with claude-3-sonnet
 - Scenario Agents: OpenRouter with claude-3.5-sonnet
 
-The ping command increments the 'active installs' button when you first set up Deebo in a new codebase :) 
+The ping command increments the 'active installs' button to let us know you set up Deebo :) 
 
 <summary>🔍 What exactly does Deebo do?</summary>
 

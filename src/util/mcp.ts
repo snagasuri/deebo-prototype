@@ -1,7 +1,8 @@
 // src/util/mcp.ts
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { readFile } from 'fs/promises';
+import { readFile, access } from 'fs/promises';
+import { safeLog } from './logger.js';
 import { join } from 'path';
 import { DEEBO_ROOT } from '../index.js';
 import { getProjectId } from './sanitize.js';
@@ -92,22 +93,22 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
       command: toolConfig.command,
       args: toolConfig.args,
       env: {
-        // Include required Windows environment variables
-        APPDATA: process.env.APPDATA,
-        HOMEDRIVE: process.env.HOMEDRIVE,
-        HOMEPATH: process.env.HOMEPATH,
-        LOCALAPPDATA: process.env.LOCALAPPDATA,
-        PATH: process.env.PATH,
-        PROCESSOR_ARCHITECTURE: process.env.PROCESSOR_ARCHITECTURE,
-        SYSTEMDRIVE: process.env.SYSTEMDRIVE,
-        SYSTEMROOT: process.env.SYSTEMROOT,
-        TEMP: process.env.TEMP,
-        USERNAME: process.env.USERNAME,
-        USERPROFILE: process.env.USERPROFILE,
+        // Ensure all env vars are strings
+        APPDATA: process.env.APPDATA ?? '',
+        HOMEDRIVE: process.env.HOMEDRIVE ?? '',
+        HOMEPATH: process.env.HOMEPATH ?? '',
+        LOCALAPPDATA: process.env.LOCALAPPDATA ?? '',
+        PATH: process.env.PATH ?? '',
+        PROCESSOR_ARCHITECTURE: process.env.PROCESSOR_ARCHITECTURE ?? '',
+        SYSTEMDRIVE: process.env.SYSTEMDRIVE ?? '',
+        SYSTEMROOT: process.env.SYSTEMROOT ?? '',
+        TEMP: process.env.TEMP ?? '',
+        USERNAME: process.env.USERNAME ?? '',
+        USERPROFILE: process.env.USERPROFILE ?? '',
         // Add our paths explicitly
-        DEEBO_NPX_PATH: toolConfig.command,  // Pass the resolved command as env var
-        DEEBO_UVX_PATH: process.env.DEEBO_UVX_PATH
-      }
+        DEEBO_NPX_PATH: toolConfig.command,
+        DEEBO_UVX_PATH: process.env.DEEBO_UVX_PATH ?? ''
+      } as Record<string, string>
     };
 
     safeLog('MCP transport config:', JSON.stringify({

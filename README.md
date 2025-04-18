@@ -39,7 +39,7 @@ That's it! Follow the prompts to configure your API key and you're ready to go.
 
 ### Managing Providers & Pings
 
-The initial `npx deebo-setup@latest` command only runs the setup script temporarily. To use the `deebo-setup providers` and `deebo-setup ping` commands directly from your terminal without `npx` each time, you need to install the package globally:
+To use the `deebo-setup providers` and `deebo-setup ping` commands directly from your terminal without `npx` each time, install the package globally:
 
 ```bash
 npm install -g deebo-setup

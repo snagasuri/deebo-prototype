@@ -1,6 +1,6 @@
 {
   "name": "deebo-setup",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "System installer for Deebo debugging tool",
   "type": "module",
   "bin": {

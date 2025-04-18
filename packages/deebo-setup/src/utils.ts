@@ -102,8 +102,10 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
     await rm(config.deeboPath, { recursive: true, force: true });
   }
 
+  // Create core directories
   await mkdir(config.deeboPath, { recursive: true });
-  console.log(chalk.green('✔ Created Deebo directory'));
+  await mkdir(join(config.deeboPath, 'debug'), { recursive: true });
+  console.log(chalk.green('✔ Created Deebo directories'));
 
   const git = createGit();
   await git.clone(DEEBO_REPO, config.deeboPath);

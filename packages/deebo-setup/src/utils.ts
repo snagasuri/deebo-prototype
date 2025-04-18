@@ -45,13 +45,18 @@ export async function findConfigPaths(): Promise<{cline?: string, claude?: strin
   const home = homedir();
   const isWindows = process.platform === 'win32';
   
+  // Validate APPDATA on Windows
+  if (isWindows && !process.env.APPDATA) {
+    throw new Error('APPDATA environment variable not set');
+  }
+  
   let clinePath = isWindows
-    ? join(process.env.APPDATA || '', 'Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json')
-    : join(home, 'Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json');
+    ? join(process.env.APPDATA!, 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json')
+    : join(home, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json');
   
   let claudePath = isWindows
-    ? join(process.env.APPDATA || '', 'Claude/claude_desktop_config.json')
-    : join(home, 'Library/Application Support/Claude/claude_desktop_config.json');
+    ? join(process.env.APPDATA!, 'Claude', 'claude_desktop_config.json')
+    : join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
 
   const result: {cline?: string, claude?: string} = {};
 
@@ -149,13 +154,20 @@ export async function updateMcpConfig(config: SetupConfig): Promise<void> {
 
   if (config.clineConfigPath) {
     try {
-      const content = await readFile(config.clineConfigPath, 'utf8');
-      let clineConfig: McpConfig = JSON.parse(content);
-      
-      if (!clineConfig.mcpServers) {
+      let clineConfig: McpConfig;
+      try {
+        // Try to read existing config first
+        const content = await readFile(config.clineConfigPath, 'utf8');
+        clineConfig = JSON.parse(content);
+        if (!clineConfig.mcpServers) {
+          clineConfig.mcpServers = {};
+        }
+      } catch {
+        // Only create new config if file doesn't exist or can't be parsed
         clineConfig = { mcpServers: {} };
       }
       
+      // Add/update deebo while preserving other servers
       clineConfig.mcpServers.deebo = deeboConfig;
       await writeFile(config.clineConfigPath, JSON.stringify(clineConfig, null, 2));
       console.log(chalk.green('✔ Updated Cline configuration'));
@@ -167,10 +179,22 @@ export async function updateMcpConfig(config: SetupConfig): Promise<void> {
 
   if (config.claudeConfigPath) {
     try {
-      const claudeConfig: McpConfig = { mcpServers: {} };
-      const claudeDir = config.claudeConfigPath.substring(0, config.claudeConfigPath.lastIndexOf(process.platform === 'win32' ? '\\\\' : '/'));
-      await mkdir(claudeDir, { recursive: true });
-      
+      let claudeConfig: McpConfig;
+      try {
+        // Try to read existing Claude config first
+        const content = await readFile(config.claudeConfigPath, 'utf8');
+        claudeConfig = JSON.parse(content);
+        if (!claudeConfig.mcpServers) {
+          claudeConfig.mcpServers = {};
+        }
+      } catch {
+        // Only create new config if file doesn't exist or can't be parsed
+        claudeConfig = { mcpServers: {} };
+        const claudeDir = config.claudeConfigPath.substring(0, config.claudeConfigPath.lastIndexOf(process.platform === 'win32' ? '\\\\' : '/'));
+        await mkdir(claudeDir, { recursive: true });
+      }
+
+      // Add/update deebo while preserving other servers
       claudeConfig.mcpServers.deebo = deeboConfig;
       await writeFile(config.claudeConfigPath, JSON.stringify(claudeConfig, null, 2));
       console.log(chalk.green('✔ Created Claude Desktop configuration'));

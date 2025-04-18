@@ -23,44 +23,85 @@ async function findToolPaths() {
   try {
     // Find npx path
     try {
-      npxPath = (await execPromise(`${findCommand} npx`)).stdout.trim();
-      if (isWindows && npxPath.includes('\r\n')) {
-        // Windows 'where' can return multiple lines, take the first one
-        npxPath = npxPath.split('\r\n')[0].trim();
+      // Get global npm bin directory first
+      const npmBinPath = (await execPromise('npm bin -g')).stdout.trim();
+      
+      if (isWindows) {
+        // Try direct path first
+        const npxCmd = join(npmBinPath, 'npx.cmd');
+        try {
+          await access(npxCmd);
+          npxPath = npxCmd;
+        } catch {
+          // Fallback to where command if direct path fails
+          npxPath = (await execPromise(`${findCommand} npx`)).stdout.trim();
+          if (npxPath.includes('\r\n')) {
+            npxPath = npxPath.split('\r\n')[0].trim();
+          }
+          
+          // If the path contains VSCode, use npm global bin instead
+          if (npxPath.toLowerCase().includes('microsoft vs code')) {
+            npxPath = join(npmBinPath, 'npx.cmd');
+            if (!await access(npxPath).then(() => true).catch(() => false)) {
+              npxPath = 'npx.cmd'; // Final fallback
+            }
+          }
+        }
+      } else {
+        // Mac/Linux path finding unchanged
+        npxPath = (await execPromise(`${findCommand} npx`)).stdout.trim();
       }
     } catch (error) {
-      // Fallback for Windows if 'where' fails
-      if (isWindows) {
-        npxPath = 'npx';
-        console.log('Using default npx command');
-      } else {
-        throw error;
-      }
+      // Fallback for any failures
+      npxPath = isWindows ? 'npx.cmd' : 'npx';
+      console.log('Using default npx command');
     }
     
     // Find uvx path
     try {
-      uvxPath = (await execPromise(`${findCommand} uvx`)).stdout.trim();
-      if (isWindows && uvxPath.includes('\r\n')) {
-        // Windows 'where' can return multiple lines, take the first one
-        uvxPath = uvxPath.split('\r\n')[0].trim();
-      }
-    } catch (error) {
-      // On Windows, we may need to fallback to Python module path
       if (isWindows) {
+        // Check Python Scripts directory first
         try {
-          // Check if uv is installed via pip
-          await execPromise('pip show uv');
-          uvxPath = 'python -m uv'; // Use Python module path
-          console.log('Using Python module path for uv');
-        } catch (pipError) {
-          // If neither found, use default (which will be handled by the fallback in mcp.ts)
-          uvxPath = 'uvx';
-          console.log('Using default uvx command');
+          const pythonResult = await execPromise('python -c "import sys; import os; print(os.path.join(sys.prefix, \'Scripts\'))"');
+          const scriptsPath = pythonResult.stdout.trim();
+          const uvxCmd = join(scriptsPath, 'uvx.exe');
+          
+          await access(uvxCmd);
+          uvxPath = uvxCmd;
+        } catch {
+          // Try where command if Scripts path fails
+          try {
+            uvxPath = (await execPromise(`${findCommand} uvx`)).stdout.trim();
+            if (uvxPath.includes('\r\n')) {
+              uvxPath = uvxPath.split('\r\n')[0].trim();
+            }
+            
+            // If path contains VSCode, try python module path
+            if (uvxPath.toLowerCase().includes('microsoft vs code')) {
+              await execPromise('pip show uv');
+              uvxPath = 'python -m uv';
+              console.log('Using Python module path for uv');
+            }
+          } catch {
+            // Last resort - try pip show and use module path
+            try {
+              await execPromise('pip show uv');
+              uvxPath = 'python -m uv';
+              console.log('Using Python module path for uv');
+            } catch {
+              uvxPath = 'uvx';
+              console.log('Using default uvx command');
+            }
+          }
         }
       } else {
-        throw error;
+        // Mac/Linux path finding
+        uvxPath = (await execPromise(`${findCommand} uvx`)).stdout.trim();
       }
+    } catch (error) {
+      // Final fallback
+      uvxPath = 'uvx';
+      console.log('Using default uvx command');
     }
   } catch (error) {
     console.error('Error finding tool paths:', error);

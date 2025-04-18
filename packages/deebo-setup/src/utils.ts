@@ -144,27 +144,25 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
   try {
     // Install desktop-commander
     console.log(chalk.blue('Installing desktop-commander...'));
-    const isWindows = process.platform === 'win32';
-    
-    if (isWindows) {
-      // On Windows, don't try to write directly to Claude config
-      console.log(chalk.blue('Using direct installation without config writing on Windows...'));
-      try {
-        execSync('npx @wonderwhy-er/desktop-commander@latest --version', { cwd: config.deeboPath });
-        console.log(chalk.green('✔ Verified desktop-commander accessibility'));
-      } catch (e) {
-        console.log(chalk.blue('Installing desktop-commander package...'));
-        execSync('npm install -g @wonderwhy-er/desktop-commander@latest', { cwd: config.deeboPath });
-        console.log(chalk.green('✔ Installed desktop-commander globally'));
-      }
-    } else {
-      // Standard setup on non-Windows platforms
-      execSync('npx @wonderwhy-er/desktop-commander@latest setup', { cwd: config.deeboPath });
-      console.log(chalk.green('✔ Installed desktop-commander'));
-    }
+    // Always run setup for desktop-commander regardless of platform
+    execSync('npx @wonderwhy-er/desktop-commander@latest setup', { cwd: config.deeboPath });
+    console.log(chalk.green('✔ Installed/Configured desktop-commander'));
   } catch (error) {
     console.error(chalk.yellow('⚠ Warning: Failed to install desktop-commander'));
     console.error(chalk.yellow('This is not a critical error. Deebo can still function.'));
+  }
+
+  // Ensure server-filesystem is accessible (needed for Windows fallback)
+  try {
+    if (process.platform === 'win32') {
+      console.log(chalk.blue('Verifying @modelcontextprotocol/server-filesystem accessibility...'));
+      // Just check if npx can find it, no setup command needed for this one
+      execSync('npx @modelcontextprotocol/server-filesystem --version', { cwd: config.deeboPath, stdio: 'ignore' });
+      console.log(chalk.green('✔ Verified @modelcontextprotocol/server-filesystem accessibility'));
+    }
+  } catch (error) {
+      // Log a warning but don't fail the install, as it's only needed for the Windows fallback
+      console.warn(chalk.yellow('⚠ Warning: Could not verify @modelcontextprotocol/server-filesystem accessibility. Filesystem operations might fail on Windows if desktop-commander is unavailable.'));
   }
 
   try {
@@ -172,21 +170,56 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
     console.log(chalk.blue('Installing git-mcp...'));
     const isWindows = process.platform === 'win32';
     if (isWindows) {
-      // For Windows, first install uv via PowerShell
+      // For Windows, first try to install uv via PowerShell
       try {
-        execSync('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"', { cwd: config.deeboPath });
-        console.log(chalk.green('✔ Installed uv'));
+        console.log(chalk.blue('Attempting to install uv via PowerShell...'));
+        const uvExePath = join(homedir(), '.local', 'bin', 'uv.exe'); // Define path to uv.exe
+        try {
+          // Attempt to delete existing uv.exe first to potentially avoid file lock issues
+          const { rm } = await import('fs/promises');
+          await rm(uvExePath, { force: true }); // force=true ignores errors if file doesn't exist
+          console.log(chalk.dim(`Attempted to remove existing ${uvExePath} before installation.`));
+        } catch (rmError) {
+          // Log if removal fails, but proceed with installation attempt anyway
+          console.warn(chalk.yellow(`Could not remove existing uv.exe: ${rmError instanceof Error ? rmError.message : String(rmError)}`));
+        }
+        // Now run the installer
+        execSync('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"', { cwd: config.deeboPath, stdio: 'inherit' }); // Show output
+        console.log(chalk.green('✔ Installed uv via PowerShell'));
         // Then use uvx to install mcp-server-git
-        execSync('uvx mcp-server-git --help', { cwd: config.deeboPath });
+        console.log(chalk.blue('Attempting to install mcp-server-git via uvx...'));
+        execSync('uvx mcp-server-git --help', { cwd: config.deeboPath, stdio: 'inherit' }); // Show output
+        console.log(chalk.green('✔ Verified mcp-server-git installation via uvx'));
       } catch (uvError) {
-        console.error(chalk.yellow('⚠ Warning: Failed to install uv or mcp-server-git'));
-        console.error(uvError instanceof Error ? uvError.message : String(uvError));
-        // Fallback to pip as a last resort
-        console.log(chalk.blue('Trying fallback installation via pip...'));
-        execSync('pip install mcp-server-git', { cwd: config.deeboPath });
+        console.error(chalk.yellow('\n⚠ Warning: Failed to install uv or mcp-server-git via PowerShell/uvx.'));
+        // Log the actual error message if possible
+        if (uvError instanceof Error) {
+           console.error(chalk.red(`Error details: ${uvError.message}`));
+           // Optionally log stderr if available (execSync might not capture it well here)
+           // if (uvError.stderr) console.error(chalk.red(`Stderr: ${uvError.stderr.toString()}`));
+        } else {
+           console.error(chalk.red(`Error details: ${String(uvError)}`));
+        }
+        // Fallback to pip
+        console.log(chalk.blue('\nTrying fallback installation via pip...'));
+        try {
+          execSync('pip install mcp-server-git', { cwd: config.deeboPath, stdio: 'inherit' }); // Show output
+          console.log(chalk.green('✔ Installed mcp-server-git via pip fallback'));
+        } catch (pipError) {
+           console.error(chalk.red('✖ Critical Error: Failed to install mcp-server-git using pip fallback.'));
+           if (pipError instanceof Error) {
+              console.error(chalk.red(`Pip Error details: ${pipError.message}`));
+           } else {
+              console.error(chalk.red(`Pip Error details: ${String(pipError)}`));
+           }
+           // Decide if this should halt the installation or just warn
+           // For now, just warn as git-mcp might not be strictly essential for all debugging
+           console.error(chalk.yellow('Deebo might not function correctly without git-mcp.'));
+        }
       }
     } else {
-      execSync('curl -LsSf https://astral.sh/uv/install.sh | sh && uvx mcp-server-git --help', { cwd: config.deeboPath });
+      // Standard non-Windows installation
+      execSync('curl -LsSf https://astral.sh/uv/install.sh | sh && uvx mcp-server-git --help', { cwd: config.deeboPath, stdio: 'inherit' });
     }
     console.log(chalk.green('✔ Installed git-mcp'));
   } catch (error) {
@@ -217,31 +250,8 @@ NODE_ENV=development`;
     throw error;
   }
 
-  // Create tools.json file
-  const toolsContent = {
-    "tools": {
-      "desktopCommander": {
-        "installCommand": "npx @wonderwhy-er/desktop-commander@latest setup",
-        "checkCommand": "npx @wonderwhy-er/desktop-commander@latest --version"
-      },
-      "git-mcp": {
-        "installCommand": process.platform === 'win32' 
-          ? "powershell -ExecutionPolicy ByPass -c \"irm https://astral.sh/uv/install.ps1 | iex\" && uvx mcp-server-git --help" 
-          : "curl -LsSf https://astral.sh/uv/install.sh | sh && uvx mcp-server-git --help",
-        "checkCommand": process.platform === 'win32' 
-          ? "uvx mcp-server-git --help || pip show mcp-server-git" 
-          : "uvx mcp-server-git --version"
-      }
-    }
-  };
-
-  try {
-    await writeFile(join(config.deeboPath, 'config/tools.json'), JSON.stringify(toolsContent, null, 2));
-    console.log(chalk.green('✔ Created tools configuration'));
-  } catch (error) {
-    console.error(chalk.yellow('⚠ Warning: Failed to create tools configuration'));
-    console.error(error instanceof Error ? error.message : String(error));
-  }
+  // Note: config/tools.json is now generated dynamically by the main Deebo app (src/index.ts)
+  // and should not be created by the setup script.
 }
 
 export async function updateMcpConfig(config: SetupConfig): Promise<void> {

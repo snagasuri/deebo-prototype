@@ -5,6 +5,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { DEEBO_ROOT } from '../index.js';
 import { getProjectId } from './sanitize.js';
+import { log } from './logger.js'; // Import the log function
 
 // Map to track active connections
 const activeConnections: Map<string, Promise<Client>> = new Map();
@@ -83,13 +84,19 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
 
 export async function connectRequiredTools(agentName: string, sessionId: string, repoPath: string): Promise<{
   gitClient: Client;
-  filesystemClient: Client;
+  filesystemClient: Client; // Keep generic name, but it connects to different tools
 }> {
+  const isWindows = process.platform === 'win32';
+  const filesystemToolName = isWindows ? 'filesystem' : 'desktopCommander';
+  const filesystemAgentName = isWindows ? `${agentName}-filesystem` : `${agentName}-desktop-commander`;
+
+  await log(sessionId, agentName.startsWith('mother') ? 'mother' : `scenario-${sessionId}`, 'debug', `Connecting filesystem tool: ${filesystemToolName} (Platform: ${process.platform})`, { repoPath });
+
+
   const [gitClient, filesystemClient] = await Promise.all([
     connectMcpTool(`${agentName}-git`, 'git-mcp', sessionId, repoPath),
-    // Switch from "filesystem-mcp" to "desktop-commander"
-    connectMcpTool(`${agentName}-desktop-commander`, 'desktopCommander', sessionId, repoPath)
+    connectMcpTool(filesystemAgentName, filesystemToolName, sessionId, repoPath) // Connect to platform-specific tool
   ]);
 
-  return { gitClient, filesystemClient };
+  return { gitClient, filesystemClient }; // Return the connected clients
 }

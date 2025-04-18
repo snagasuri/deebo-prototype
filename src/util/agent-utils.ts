@@ -20,6 +20,349 @@ interface LlmConfig {
  * Generates the mother agent's system prompt with the given parameters
  */
 export function getMotherAgentPrompt(useMemoryBank: boolean, memoryBankPath: string): string {
+  const isWindows = process.platform === 'win32';
+  const filesystemToolName = isWindows ? 'filesystem' : 'desktopCommander';
+  const filesystemServerName = isWindows ? 'filesystem' : 'desktop-commander'; // Server name used in <server_name> tag
+
+  // Define tool descriptions based on platform
+  let filesystemToolDescriptions = '';
+  if (isWindows) {
+    // Tools for @modelcontextprotocol/server-filesystem
+    filesystemToolDescriptions = `
+filesystem (use ONLY for non-git operations):
+
+Filesystem Tools:
+- read_file: Read file contents
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_file</tool_name>
+    <arguments>
+      {
+        "path": "${memoryBankPath}/activeContext.md"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- read_multiple_files: Read multiple files at once
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_multiple_files</tool_name>
+    <arguments>
+      {
+        "paths": ["file1.ts", "file2.ts"]
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- write_file: Write content to files
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>write_file</tool_name>
+    <arguments>
+      {
+        "path": "file.ts",
+        "content": "console.log('hello');"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- list_directory: List directory contents
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>list_directory</tool_name>
+    <arguments>
+      {
+        "path": "${memoryBankPath}"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- search_files: Search files with pattern
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>search_files</tool_name>
+    <arguments>
+      {
+        "path": "${memoryBankPath}",
+        "pattern": "error",
+        "file_pattern": "*.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- create_directory: Create a new directory
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>create_directory</tool_name>
+    <arguments>
+      {
+        "path": "new-dir"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- move_file: Move or rename a file
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>move_file</tool_name>
+    <arguments>
+      {
+        "source": "old.ts",
+        "destination": "new.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- get_file_info: Get file metadata
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>get_file_info</tool_name>
+    <arguments>
+      {
+        "path": "file.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+`;
+  } else {
+    // Tools for @wonderwhy-er/desktop-commander (non-Windows)
+    filesystemToolDescriptions = `
+desktop-commander (use ONLY for non-git operations):
+
+Terminal Tools:
+- execute_command: Run terminal commands with timeout
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>execute_command</tool_name>
+    <arguments>
+      {
+        "command": "npm run build",
+        "timeout_ms": 5000
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- read_output: Get output from running commands
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_output</tool_name>
+    <arguments>
+      {
+        "pid": 12345
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- force_terminate: Stop running command sessions
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>force_terminate</tool_name>
+    <arguments>
+      {
+        "pid": 12345
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- list_sessions: View active command sessions
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>list_sessions</tool_name>
+    <arguments>
+      {}
+    </arguments>
+  </use_mcp_tool>
+
+- list_processes: List system processes
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>list_processes</tool_name>
+    <arguments>
+      {}
+    </arguments>
+  </use_mcp_tool>
+
+- kill_process: Terminate processes by PID
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>kill_process</tool_name>
+    <arguments>
+      {
+        "pid": 12345
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- block_command: Block a command from execution
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>block_command</tool_name>
+    <arguments>
+      {
+        "command": "rm -rf /"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- unblock_command: Unblock a command
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>unblock_command</tool_name>
+    <arguments>
+      {
+        "command": "rm -rf /"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+Filesystem Tools:
+- read_file: Read file contents
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_file</tool_name>
+    <arguments>
+      {
+        "path": "${memoryBankPath}/activeContext.md"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- read_multiple_files: Read multiple files at once
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_multiple_files</tool_name>
+    <arguments>
+      {
+        "paths": ["file1.ts", "file2.ts"]
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- write_file: Write content to files
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>write_file</tool_name>
+    <arguments>
+      {
+        "path": "file.ts",
+        "content": "console.log('hello');"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- edit_file: Apply surgical text replacements
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>edit_file</tool_name>
+    <arguments>
+      {
+        "path": "file.ts",
+        "diff": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- list_directory: List directory contents
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>list_directory</tool_name>
+    <arguments>
+      {
+        "path": "${memoryBankPath}"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- search_files: Search files with pattern
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>search_files</tool_name>
+    <arguments>
+      {
+        "path": "${memoryBankPath}",
+        "pattern": "error",
+        "file_pattern": "*.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- create_directory: Create a new directory
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>create_directory</tool_name>
+    <arguments>
+      {
+        "path": "new-dir"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- move_file: Move or rename a file
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>move_file</tool_name>
+    <arguments>
+      {
+        "source": "old.ts",
+        "destination": "new.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- get_file_info: Get file metadata
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>get_file_info</tool_name>
+    <arguments>
+      {
+        "path": "file.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- search_code: Recursive code search
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>search_code</tool_name>
+    <arguments>
+      {
+        "path": "${memoryBankPath}",
+        "pattern": "function",
+        "filePattern": "*.ts",
+        "contextLines": 2,
+        "ignoreCase": true
+      }
+    </arguments>
+  </use_mcp_tool>
+`;
+  }
+
   return `You are the mother agent in an OODA loop debugging investigation. Your core mission:
 
 1. INVESTIGATE and HYPOTHESIZE aggressively
@@ -110,111 +453,47 @@ git-mcp (use for ALL git operations):
 - git_show: Show contents of a specific commit
   Example: { "repo_path": "/path/to/repo", "revision": "HEAD" }
 
-desktop-commander (use ONLY for non-git operations):
+${filesystemToolDescriptions}
 
-Terminal Tools:
-- execute_command: Run terminal commands with timeout
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>execute_command</tool_name>
-    <arguments>
-      {
-        "command": "npm run build",
-        "timeout_ms": 5000
-      }
-    </arguments>
-  </use_mcp_tool>
+IMPORTANT MEMORY BANK WARNINGS:
+- DO NOT use write_file on memory bank files - use ${filesystemToolName} ${isWindows ? '' : 'edit_file '}instead (if available) or read/write carefully.
+- Only edit memory bank through ${filesystemToolName} ${isWindows ? '' : 'edit_file '}(if available) to avoid overwrites.
+- Always use ${memoryBankPath} as absolute path for memory bank files`;
+}
 
-- read_output: Get output from running commands
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>read_output</tool_name>
-    <arguments>
-      {
-        "pid": 12345
-      }
-    </arguments>
-  </use_mcp_tool>
+/**
+ * Generates the scenario agent's system prompt with the given parameters
+ */
+export function getScenarioAgentPrompt(args: {
+  branch: string;
+  hypothesis: string;
+  context: string;
+  repoPath: string;
+}): string {
+  const isWindows = process.platform === 'win32';
+  const filesystemToolName = isWindows ? 'filesystem' : 'desktopCommander';
+  const filesystemServerName = isWindows ? 'filesystem' : 'desktop-commander';
+  
+  // We need to check if memoryBankPath is used in the prompt for scenario agent
+  // Since it's not passed as parameter, we'll need a default/placeholder value
+  const memoryBankPath = `${args.repoPath}/memory-bank`;
 
-- force_terminate: Stop running command sessions
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>force_terminate</tool_name>
-    <arguments>
-      {
-        "pid": 12345
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- list_sessions: View active command sessions
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>list_sessions</tool_name>
-    <arguments>
-      {}
-    </arguments>
-  </use_mcp_tool>
-
-- list_processes: List system processes
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>list_processes</tool_name>
-    <arguments>
-      {}
-    </arguments>
-  </use_mcp_tool>
-
-- kill_process: Terminate processes by PID
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>kill_process</tool_name>
-    <arguments>
-      {
-        "pid": 12345
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- block_command: Block a command from execution
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>block_command</tool_name>
-    <arguments>
-      {
-        "command": "rm -rf /"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- unblock_command: Unblock a command
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>unblock_command</tool_name>
-    <arguments>
-      {
-        "command": "rm -rf /"
-      }
-    </arguments>
-  </use_mcp_tool>
+  // Define tool descriptions based on platform
+  let filesystemToolDescriptions = '';
+  if (isWindows) {
+    // Tools for @modelcontextprotocol/server-filesystem
+    filesystemToolDescriptions = `
+filesystem (use ONLY for non-git operations):
 
 Filesystem Tools:
 - read_file: Read file contents
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>read_file</tool_name>
     <arguments>
       {
-        "path": "${memoryBankPath}/activeContext.md"
+        "path": "${args.repoPath}/file.ts"
       }
     </arguments>
   </use_mcp_tool>
@@ -222,7 +501,7 @@ Filesystem Tools:
 - read_multiple_files: Read multiple files at once
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>read_multiple_files</tool_name>
     <arguments>
       {
@@ -234,7 +513,7 @@ Filesystem Tools:
 - write_file: Write content to files
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>write_file</tool_name>
     <arguments>
       {
@@ -244,27 +523,14 @@ Filesystem Tools:
     </arguments>
   </use_mcp_tool>
 
-- edit_file: Apply surgical text replacements
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>edit_file</tool_name>
-    <arguments>
-      {
-        "path": "file.ts",
-        "diff": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"
-      }
-    </arguments>
-  </use_mcp_tool>
-
 - list_directory: List directory contents
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>list_directory</tool_name>
     <arguments>
       {
-        "path": "${memoryBankPath}"
+        "path": "${args.repoPath}"
       }
     </arguments>
   </use_mcp_tool>
@@ -272,11 +538,11 @@ Filesystem Tools:
 - search_files: Search files with pattern
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>search_files</tool_name>
     <arguments>
       {
-        "path": "${memoryBankPath}",
+        "path": "${args.repoPath}",
         "pattern": "error",
         "file_pattern": "*.ts"
       }
@@ -286,7 +552,7 @@ Filesystem Tools:
 - create_directory: Create a new directory
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>create_directory</tool_name>
     <arguments>
       {
@@ -298,7 +564,7 @@ Filesystem Tools:
 - move_file: Move or rename a file
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>move_file</tool_name>
     <arguments>
       {
@@ -311,7 +577,7 @@ Filesystem Tools:
 - get_file_info: Get file metadata
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>get_file_info</tool_name>
     <arguments>
       {
@@ -323,11 +589,11 @@ Filesystem Tools:
 - search_code: Recursive code search
   Example:
   <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
+    <server_name>${filesystemServerName}</server_name>
     <tool_name>search_code</tool_name>
     <arguments>
       {
-        "path": "${memoryBankPath}",
+        "path": "${args.repoPath}",
         "pattern": "function",
         "filePattern": "*.ts",
         "contextLines": 2,
@@ -335,24 +601,238 @@ Filesystem Tools:
       }
     </arguments>
   </use_mcp_tool>
+`;
+  } else {
+    // Tools for @wonderwhy-er/desktop-commander (non-Windows)
+    filesystemToolDescriptions = `
+desktop-commander (use ONLY for non-git operations):
 
-IMPORTANT MEMORY BANK WARNINGS:
-- DO NOT use write_file on memory bank files - use filesystem-mcp edit_file instead
-- Only edit memory bank through edit_file to avoid overwrites
-- Always use ${memoryBankPath} as absolute path for memory bank files`;
-}
+Terminal Tools:
+- execute_command: Run terminal commands with timeout
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>execute_command</tool_name>
+    <arguments>
+      {
+        "command": "npm run build",
+        "timeout_ms": 5000
+      }
+    </arguments>
+  </use_mcp_tool>
 
+- read_output: Get output from running commands
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_output</tool_name>
+    <arguments>
+      {
+        "pid": 12345
+      }
+    </arguments>
+  </use_mcp_tool>
 
+- force_terminate: Stop running command sessions
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>force_terminate</tool_name>
+    <arguments>
+      {
+        "pid": 12345
+      }
+    </arguments>
+  </use_mcp_tool>
 
-/**
- * Generates the scenario agent's system prompt with the given parameters
- */
-export function getScenarioAgentPrompt(args: {
-  branch: string;
-  hypothesis: string;
-  context: string;
-  repoPath: string;
-}): string {
+- list_sessions: View active command sessions
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>list_sessions</tool_name>
+    <arguments>
+      {}
+    </arguments>
+  </use_mcp_tool>
+
+- list_processes: List system processes
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>list_processes</tool_name>
+    <arguments>
+      {}
+    </arguments>
+  </use_mcp_tool>
+
+- kill_process: Terminate processes by PID
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>kill_process</tool_name>
+    <arguments>
+      {
+        "pid": 12345
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- block_command: Block a command from execution
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>block_command</tool_name>
+    <arguments>
+      {
+        "command": "rm -rf /"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- unblock_command: Unblock a command
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>unblock_command</tool_name>
+    <arguments>
+      {
+        "command": "rm -rf /"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+Filesystem Tools:
+- read_file: Read file contents
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_file</tool_name>
+    <arguments>
+      {
+        "path": "${args.repoPath}/file.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- read_multiple_files: Read multiple files at once
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>read_multiple_files</tool_name>
+    <arguments>
+      {
+        "paths": ["file1.ts", "file2.ts"]
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- write_file: Write content to files
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>write_file</tool_name>
+    <arguments>
+      {
+        "path": "file.ts",
+        "content": "console.log('hello');"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- edit_file: Apply surgical text replacements
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>edit_file</tool_name>
+    <arguments>
+      {
+        "path": "file.ts",
+        "diff": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- list_directory: List directory contents
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>list_directory</tool_name>
+    <arguments>
+      {
+        "path": "${args.repoPath}"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- search_files: Search files with pattern
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>search_files</tool_name>
+    <arguments>
+      {
+        "path": "${args.repoPath}",
+        "pattern": "error",
+        "file_pattern": "*.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- create_directory: Create a new directory
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>create_directory</tool_name>
+    <arguments>
+      {
+        "path": "new-dir"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- move_file: Move or rename a file
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>move_file</tool_name>
+    <arguments>
+      {
+        "source": "old.ts",
+        "destination": "new.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- get_file_info: Get file metadata
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>get_file_info</tool_name>
+    <arguments>
+      {
+        "path": "file.ts"
+      }
+    </arguments>
+  </use_mcp_tool>
+
+- search_code: Recursive code search
+  Example:
+  <use_mcp_tool>
+    <server_name>${filesystemServerName}</server_name>
+    <tool_name>search_code</tool_name>
+    <arguments>
+      {
+        "path": "${args.repoPath}",
+        "pattern": "function",
+        "filePattern": "*.ts",
+        "contextLines": 2,
+        "ignoreCase": true
+      }
+    </arguments>
+  </use_mcp_tool>
+`;
+  }
+
   return `You are a scenario agent investigating a bug based on a specific hypothesis.
 A dedicated Git branch '${args.branch}' has been created for your investigation.
 
@@ -400,231 +880,7 @@ git-mcp (use for ALL git operations):
 - git_show: Show contents of a specific commit
   Example: { "repo_path": "${args.repoPath}", "revision": "HEAD" }
 
-desktop-commander (use ONLY for non-git operations):
-
-Terminal Tools:
-- execute_command: Run terminal commands with timeout
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>execute_command</tool_name>
-    <arguments>
-      {
-        "command": "npm run build",
-        "timeout_ms": 5000
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- read_output: Get output from running commands
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>read_output</tool_name>
-    <arguments>
-      {
-        "pid": 12345
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- force_terminate: Stop running command sessions
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>force_terminate</tool_name>
-    <arguments>
-      {
-        "pid": 12345
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- list_sessions: View active command sessions
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>list_sessions</tool_name>
-    <arguments>
-      {}
-    </arguments>
-  </use_mcp_tool>
-
-- list_processes: List system processes
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>list_processes</tool_name>
-    <arguments>
-      {}
-    </arguments>
-  </use_mcp_tool>
-
-- kill_process: Terminate processes by PID
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>kill_process</tool_name>
-    <arguments>
-      {
-        "pid": 12345
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- block_command: Block a command from execution
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>block_command</tool_name>
-    <arguments>
-      {
-        "command": "rm -rf /"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- unblock_command: Unblock a command
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>unblock_command</tool_name>
-    <arguments>
-      {
-        "command": "rm -rf /"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-Filesystem Tools:
-- read_file: Read file contents
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>read_file</tool_name>
-    <arguments>
-      {
-        "path": "${args.repoPath}/file.ts"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- read_multiple_files: Read multiple files at once
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>read_multiple_files</tool_name>
-    <arguments>
-      {
-        "paths": ["file1.ts", "file2.ts"]
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- write_file: Write content to files
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>write_file</tool_name>
-    <arguments>
-      {
-        "path": "file.ts",
-        "content": "console.log('hello');"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- edit_file: Apply surgical text replacements
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>edit_file</tool_name>
-    <arguments>
-      {
-        "path": "file.ts",
-        "diff": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- list_directory: List directory contents
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>list_directory</tool_name>
-    <arguments>
-      {
-        "path": "${args.repoPath}"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- search_files: Search files with pattern
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>search_files</tool_name>
-    <arguments>
-      {
-        "path": "${args.repoPath}",
-        "pattern": "error",
-        "file_pattern": "*.ts"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- create_directory: Create a new directory
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>create_directory</tool_name>
-    <arguments>
-      {
-        "path": "new-dir"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- move_file: Move or rename a file
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>move_file</tool_name>
-    <arguments>
-      {
-        "source": "old.ts",
-        "destination": "new.ts"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- get_file_info: Get file metadata
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>get_file_info</tool_name>
-    <arguments>
-      {
-        "path": "file.ts"
-      }
-    </arguments>
-  </use_mcp_tool>
-
-- search_code: Recursive code search
-  Example:
-  <use_mcp_tool>
-    <server_name>desktop-commander</server_name>
-    <tool_name>search_code</tool_name>
-    <arguments>
-      {
-        "path": "${args.repoPath}",
-        "pattern": "function",
-        "filePattern": "*.ts",
-        "contextLines": 2,
-        "ignoreCase": true
-      }
-    </arguments>
-  </use_mcp_tool>
+${filesystemToolDescriptions}
 
 REPORT FORMAT:
 When you've completed your investigation, use:
@@ -645,7 +901,6 @@ CONFIDENCE: [High/Medium/Low]
 [Explanation of confidence level]
 </report>`;
 }
-
 
 export async function callLlm(
   messages: ChatCompletionMessageParam[],

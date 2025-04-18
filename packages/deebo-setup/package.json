@@ -1,10 +1,10 @@
 {
   "name": "deebo-setup",
-  "version": "1.0.40",
+  "version": "1.0.41",
   "description": "System installer for Deebo debugging tool",
   "type": "module",
   "bin": {
-    "deebo-setup": "./build/index.js"
+    "deebo-setup": "build/index.js"
   },
   "scripts": {
     "build": "tsc",

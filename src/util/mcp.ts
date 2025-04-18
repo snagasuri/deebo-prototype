@@ -78,10 +78,44 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
          .replace(/{memoryRoot}/g, memoryRoot)
     );
 
-    const transport = new StdioClientTransport({
+    // Log the exact paths before creating transport
+    if (process.platform === 'win32') {
+      console.log('Windows transport paths:', {
+        command: toolConfig.command,
+        args: toolConfig.args,
+        env: process.env
+      });
+    }
+
+    // Configure transport with explicit environment
+    const transportConfig = {
       command: toolConfig.command,
-      args: toolConfig.args
-    });
+      args: toolConfig.args,
+      env: {
+        // Include required Windows environment variables
+        APPDATA: process.env.APPDATA,
+        HOMEDRIVE: process.env.HOMEDRIVE,
+        HOMEPATH: process.env.HOMEPATH,
+        LOCALAPPDATA: process.env.LOCALAPPDATA,
+        PATH: process.env.PATH,
+        PROCESSOR_ARCHITECTURE: process.env.PROCESSOR_ARCHITECTURE,
+        SYSTEMDRIVE: process.env.SYSTEMDRIVE,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        TEMP: process.env.TEMP,
+        USERNAME: process.env.USERNAME,
+        USERPROFILE: process.env.USERPROFILE,
+        // Add our paths explicitly
+        DEEBO_NPX_PATH: toolConfig.command,  // Pass the resolved command as env var
+        DEEBO_UVX_PATH: process.env.DEEBO_UVX_PATH
+      }
+    };
+
+    // Debug log for Windows
+    if (process.platform === 'win32') {
+      console.log('Windows transport config:', transportConfig);
+    }
+
+    const transport = new StdioClientTransport(transportConfig);
 
     const client = new Client(
       { name, version: '1.0.0' },

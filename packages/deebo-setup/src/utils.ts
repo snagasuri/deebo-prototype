@@ -140,83 +140,11 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
     // Ignore if already exists
   }
 
-  // Install required MCP tools
-  try {
-    // Install desktop-commander
-    console.log(chalk.blue('Installing desktop-commander...'));
-    // Always run setup for desktop-commander regardless of platform
-    execSync('npx @wonderwhy-er/desktop-commander@latest setup', { cwd: config.deeboPath });
-    console.log(chalk.green('✔ Installed/Configured desktop-commander'));
-  } catch (error) {
-    console.error(chalk.yellow('⚠ Warning: Failed to install desktop-commander'));
-    console.error(chalk.yellow('This is not a critical error. Deebo can still function.'));
-    // Note: If desktop-commander fails, subsequent steps might also have issues.
-    // Consider if a more critical error handling is needed here.
-  }
+  // Removed installation steps for desktop-commander and git-mcp.
+  // Deebo runtime will now rely on these being pre-installed and available in PATH.
+  console.log(chalk.yellow('ℹ Skipping installation of desktop-commander and git-mcp.'));
+  console.log(chalk.yellow('  Ensure these tools (and dependencies like uv/pip) are installed manually.'));
 
-  // Removed the check for server-filesystem accessibility
-
-  try {
-    // Install git-mcp
-    console.log(chalk.blue('Installing git-mcp...'));
-    const isWindows = process.platform === 'win32';
-    if (isWindows) {
-      // For Windows, first try to install uv via PowerShell
-      try {
-        console.log(chalk.blue('Attempting to install uv via PowerShell...'));
-        const uvExePath = join(homedir(), '.local', 'bin', 'uv.exe'); // Define path to uv.exe
-        try {
-          // Attempt to delete existing uv.exe first to potentially avoid file lock issues
-          const { rm } = await import('fs/promises');
-          await rm(uvExePath, { force: true }); // force=true ignores errors if file doesn't exist
-          console.log(chalk.dim(`Attempted to remove existing ${uvExePath} before installation.`));
-        } catch (rmError) {
-          // Log if removal fails, but proceed with installation attempt anyway
-          console.warn(chalk.yellow(`Could not remove existing uv.exe: ${rmError instanceof Error ? rmError.message : String(rmError)}`));
-        }
-        // Now run the installer
-        execSync('powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"', { cwd: config.deeboPath, stdio: 'inherit' }); // Show output
-        console.log(chalk.green('✔ Installed uv via PowerShell'));
-        // Then use uvx to install mcp-server-git
-        console.log(chalk.blue('Attempting to install mcp-server-git via uvx...'));
-        execSync('uvx mcp-server-git --help', { cwd: config.deeboPath, stdio: 'inherit' }); // Show output
-        console.log(chalk.green('✔ Verified mcp-server-git installation via uvx'));
-      } catch (uvError) {
-        console.error(chalk.yellow('\n⚠ Warning: Failed to install uv or mcp-server-git via PowerShell/uvx.'));
-        // Log the actual error message if possible
-        if (uvError instanceof Error) {
-           console.error(chalk.red(`Error details: ${uvError.message}`));
-           // Optionally log stderr if available (execSync might not capture it well here)
-           // if (uvError.stderr) console.error(chalk.red(`Stderr: ${uvError.stderr.toString()}`));
-        } else {
-           console.error(chalk.red(`Error details: ${String(uvError)}`));
-        }
-        // Fallback to pip
-        console.log(chalk.blue('\nTrying fallback installation via pip...'));
-        try {
-          execSync('pip install mcp-server-git', { cwd: config.deeboPath, stdio: 'inherit' }); // Show output
-          console.log(chalk.green('✔ Installed mcp-server-git via pip fallback'));
-        } catch (pipError) {
-           console.error(chalk.red('✖ Critical Error: Failed to install mcp-server-git using pip fallback.'));
-           if (pipError instanceof Error) {
-              console.error(chalk.red(`Pip Error details: ${pipError.message}`));
-           } else {
-              console.error(chalk.red(`Pip Error details: ${String(pipError)}`));
-           }
-           // Decide if this should halt the installation or just warn
-           // For now, just warn as git-mcp might not be strictly essential for all debugging
-           console.error(chalk.yellow('Deebo might not function correctly without git-mcp.'));
-        }
-      }
-    } else {
-      // Standard non-Windows installation
-      execSync('curl -LsSf https://astral.sh/uv/install.sh | sh && uvx mcp-server-git --help', { cwd: config.deeboPath, stdio: 'inherit' });
-    }
-    console.log(chalk.green('✔ Installed git-mcp'));
-  } catch (error) {
-    console.error(chalk.yellow('⚠ Warning: Failed to install git-mcp'));
-    console.error(error instanceof Error ? error.message : String(error));
-  }
 }
 
 export async function writeEnvFile(config: SetupConfig): Promise<void> {

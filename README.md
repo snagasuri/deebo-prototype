@@ -39,7 +39,7 @@ That's it! Follow the prompts to configure your API key and you're ready to go.
 
 ### Managing Providers & Pings
 
-The initial `npx deebo-setup@latest` command only runs the setup script temporarily. To use the `deebo-setup providers` and `deebo-setup ping` commands directly from your terminal without `npx` each time, you need to install the package globally:
+To use the `deebo-setup providers` and `deebo-setup ping` commands directly from your terminal without `npx` each time, install the package globally:
 
 ```bash
 npm install -g deebo-setup
@@ -52,6 +52,10 @@ deebo-setup providers  # manage your LLM providers
 deebo-setup ping      # show us you're alive
 ```
 
+<details>
+
+<summary> deebo-setup commands info </summary>
+
 The providers command allows you to:
 - Configure Mother Agent (provider, model, API key)
 - Configure Scenario Agent (provider, model, API key)
@@ -61,7 +65,8 @@ You can use different providers for Mother and Scenario agents. For example:
 - Mother Agent: Anthropic with claude-3-sonnet
 - Scenario Agents: OpenRouter with claude-3.5-sonnet
 
-<details>
+The ping command increments the 'active installs' button to let us know you set up Deebo :) 
+
 <summary>🔍 What exactly does Deebo do?</summary>
 
 Deebo is your AI agent's debugging partner. When your agent encounters a tricky bug, Deebo:

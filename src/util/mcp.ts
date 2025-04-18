@@ -56,10 +56,30 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
          .replace(/{memoryRoot}/g, memoryRoot)
     );
 
-    const transport = new StdioClientTransport({
+    // Configure transport with explicit environment for Windows
+    const transportConfig = {
       command: toolConfig.command,
-      args: toolConfig.args
-    });
+      args: toolConfig.args,
+      env: (process.platform === 'win32' ? {
+        // Include required Windows environment variables
+        APPDATA: process.env.APPDATA ?? '',
+        HOMEDRIVE: process.env.HOMEDRIVE ?? '',
+        HOMEPATH: process.env.HOMEPATH ?? '',
+        LOCALAPPDATA: process.env.LOCALAPPDATA ?? '',
+        PATH: process.env.PATH ?? '',
+        PROCESSOR_ARCHITECTURE: process.env.PROCESSOR_ARCHITECTURE ?? '',
+        SYSTEMDRIVE: process.env.SYSTEMDRIVE ?? '',
+        SYSTEMROOT: process.env.SYSTEMROOT ?? '',
+        TEMP: process.env.TEMP ?? '',
+        USERNAME: process.env.USERNAME ?? '',
+        USERPROFILE: process.env.USERPROFILE ?? '',
+        // Pass through our tool paths
+        DEEBO_NPX_PATH: toolConfig.command,
+        DEEBO_UVX_PATH: process.env.DEEBO_UVX_PATH ?? ''
+      } : process.env) as Record<string, string>
+    };
+
+    const transport = new StdioClientTransport(transportConfig);
 
     const client = new Client(
       { name, version: '1.0.0' },

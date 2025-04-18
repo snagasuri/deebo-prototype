@@ -85,11 +85,18 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
     }
 
     const { rm } = await import('fs/promises');
+    console.log(chalk.yellow('Removing existing installation...'));
     await rm(config.deeboPath, { recursive: true, force: true });
+    // Wait a bit for filesystem to catch up
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log(chalk.green('✔ Cleaned up old installation'));
   }
 
+  // Create core directories
   await mkdir(config.deeboPath, { recursive: true });
-  console.log(chalk.green('✔ Created Deebo directory'));
+  await mkdir(join(config.deeboPath, 'debug'), { recursive: true });
+  await mkdir(join(config.deeboPath, 'memory-bank'), { recursive: true });
+  console.log(chalk.green('✔ Created Deebo directories'));
 
   const git = createGit();
   await git.clone(DEEBO_REPO, config.deeboPath);

@@ -39,7 +39,13 @@ That's it! Follow the prompts to configure your API key and you're ready to go.
 
 ### Managing Providers & Pings
 
-After installation, you can:
+After installation, install the package globally:
+
+```bash
+npm install -g deebo-setup
+```
+
+Then you can use these commands from anywhere:
 
 ```bash
 deebo-setup providers  # manage your LLM providers

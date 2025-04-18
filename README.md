@@ -10,7 +10,7 @@
          src="https://img.shields.io/npm/v/deebo-setup?color=cb3837">
   </a>
   <img alt="active installs"
-       src="https://img.shields.io/endpoint?url=https://deebo-active-counter.ramnag2003.workers.dev/active">
+       src="https://img.shields.io/endpoint?url=https://deebo-active-counter.ramnag2003.workers.dev/active&maxAge=0">
 </p>
 
 Deebo is an autonomous debugging system that works alongside AI coding agents (Claude, Cline, Cursor, etc.) to solve complex bugs. It runs parallel experiments in isolated Git branches and delivers validated fixes in parallel.

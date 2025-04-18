@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+// LLM host validation
 export const LlmHostSchema = z.enum(['openrouter', 'anthropic', 'gemini']);
 export type LlmHost = z.infer<typeof LlmHostSchema>;
 
+// MCP config schema for writing configs
 export const McpConfigSchema = z.object({
   mcpServers: z.record(z.object({
     autoApprove: z.array(z.string()),
@@ -17,16 +19,14 @@ export const McpConfigSchema = z.object({
 
 export type McpConfig = z.infer<typeof McpConfigSchema>;
 
-export const LlmModelSchema = z.string();
-export type LlmModel = z.infer<typeof LlmModelSchema>;
-
+// Full setup config
 export interface SetupConfig {
   deeboPath: string;
   envPath: string;
   motherHost: LlmHost;
-  motherModel: LlmModel;
+  motherModel: string;
   scenarioHost: LlmHost;
-  scenarioModel: LlmModel;
+  scenarioModel: string;
   motherApiKey: string;
   scenarioApiKey: string;
   clineConfigPath?: string;

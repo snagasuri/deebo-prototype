@@ -85,7 +85,7 @@ export async function connectRequiredTools(agentName: string, sessionId: string,
   const filesystemToolName = 'desktopCommander';
   const filesystemAgentName = `${agentName}-desktop-commander`;
 
-  await log(sessionId, agentName.startsWith('mother') ? 'mother' : `scenario-${sessionId}`, 'debug', `Connecting filesystem tool: ${filesystemToolName}`, { repoPath });
+  // Removed log line for connecting filesystem tool
 
   const [gitClient, filesystemClient] = await Promise.all([
     connectMcpTool(`${agentName}-git`, 'git-mcp', sessionId, repoPath),

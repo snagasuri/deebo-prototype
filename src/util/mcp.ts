@@ -44,10 +44,32 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
     const memoryPath = join(DEEBO_ROOT, 'memory-bank', projectId);
     const memoryRoot = join(DEEBO_ROOT, 'memory-bank');
     
-    // Replace placeholders in command
+    // Normalize paths for Windows and replace placeholders in command
+    let npxCommand = process.env.DEEBO_NPX_PATH || 'npx';
+    let uvxCommand = process.env.DEEBO_UVX_PATH || 'uvx';
+    
+    if (isWindows) {
+      // If path has VSCode in it, try npm global bin
+      if (npxCommand.toLowerCase().includes('microsoft vs code')) {
+        try {
+          const { execSync } = await import('child_process');
+          const npmBinPath = execSync('npm bin -g').toString().trim();
+          const npxCmd = join(npmBinPath, 'npx.cmd');
+          // Check if the npx.cmd exists
+          await access(npxCmd);
+          npxCommand = npxCmd;
+        } catch {
+          npxCommand = 'npx.cmd';
+        }
+      }
+      // Add .cmd extension if using bare command name
+      if (npxCommand === 'npx') npxCommand = 'npx.cmd';
+      if (uvxCommand === 'uvx') uvxCommand = 'uvx.cmd';
+    }
+
     toolConfig.command = toolConfig.command
-      .replace(/{npxPath}/g, process.env.DEEBO_NPX_PATH || 'npx') // Provide default 'npx'
-      .replace(/{uvxPath}/g, process.env.DEEBO_UVX_PATH || 'uvx'); // Provide default 'uvx'
+      .replace(/{npxPath}/g, npxCommand)
+      .replace(/{uvxPath}/g, uvxCommand);
 
     // Replace placeholders in arguments  
     toolConfig.args = toolConfig.args.map((arg: string) =>

@@ -39,7 +39,7 @@ async function sendPing() {
     const req = https.request(
       { 
         method: "POST", 
-        hostname: "api.deebo.dev", 
+        hostname: "deebo-active-counter.ramnag2003.workers.dev", 
         path: "/ping", 
         headers: { "content-type": "application/json" } 
       },

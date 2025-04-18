@@ -110,10 +110,11 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
       }
     };
 
-    // Debug log for Windows
-    if (process.platform === 'win32') {
-      console.log('Windows transport config:', transportConfig);
-    }
+    safeLog('MCP transport config:', JSON.stringify({
+      command: transportConfig.command,
+      args: transportConfig.args,
+      env: transportConfig.env
+    }, null, 2));
 
     const transport = new StdioClientTransport(transportConfig);
 

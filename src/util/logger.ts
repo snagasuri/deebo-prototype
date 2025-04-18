@@ -11,8 +11,6 @@ import { DEEBO_ROOT } from '../index.js';
 const DEBUG_LOG_PATH = process.env.DEBUG_LOG_PATH || join(DEEBO_ROOT, 'debug.log');
 
 export function safeLog(...args: any[]) {
-  if (process.env.DEBUG_DEEBO !== 'true') return;
-
   const msg = `[${new Date().toISOString()}] ${args.map(String).join(' ')}\n`;
   try {
     appendFileSync(DEBUG_LOG_PATH, msg);

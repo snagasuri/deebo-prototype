@@ -92,15 +92,15 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
     console.log(chalk.green('✔ Cleaned up old installation'));
   }
 
-  // Create core directories
-  await mkdir(config.deeboPath, { recursive: true });
-  await mkdir(join(config.deeboPath, 'debug'), { recursive: true });
-  await mkdir(join(config.deeboPath, 'memory-bank'), { recursive: true });
-  console.log(chalk.green('✔ Created Deebo directories'));
-
+  // Clone first to get fresh directory
   const git = createGit();
   await git.clone(DEEBO_REPO, config.deeboPath);
   console.log(chalk.green('✔ Cloned Deebo repository'));
+
+  // Then create our additional directories
+  await mkdir(join(config.deeboPath, 'debug'), { recursive: true });
+  await mkdir(join(config.deeboPath, 'memory-bank'), { recursive: true });
+  console.log(chalk.green('✔ Created Deebo directories'));
 
   const { execSync } = await import('child_process');
   execSync('npm install && npm run build', { cwd: config.deeboPath, stdio: 'inherit' });

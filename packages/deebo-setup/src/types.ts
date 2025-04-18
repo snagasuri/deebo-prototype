@@ -27,7 +27,8 @@ export interface SetupConfig {
   motherModel: LlmModel;
   scenarioHost: LlmHost;
   scenarioModel: LlmModel;
-  apiKey: string;
+  motherApiKey: string;
+  scenarioApiKey: string;
   clineConfigPath?: string;
   claudeConfigPath?: string;
 }

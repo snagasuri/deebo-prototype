@@ -9,23 +9,141 @@ import {
   findConfigPaths,
   setupDeeboDirectory,
   writeEnvFile,
-  updateMcpConfig
+  updateMcpConfig,
+  updateAgentConfig,
+  removeProviderConfig,
+  defaultModels
 } from './utils.js';
 
-async function main() {
+// Parse command line arguments
+const args = process.argv.slice(2);
+const command = args[0];
+
+if (command === 'providers') {
+  manageProviders().catch(console.error);
+} else {
+  main().catch(console.error);
+}
+
+async function manageProviders() {
   try {
+    process.stdout.write('\u001b[2J\u001b[0;0H'); // Clear console
+    console.log(chalk.blue('==== Deebo Provider Management ====\n'));
+    
     // Check prerequisites
     await checkPrerequisites();
 
     // Find config paths
     const configPaths = await findConfigPaths();
 
-    // Get Mother agent configuration
-    const defaultModels: Record<string, string> = {
-      openrouter: 'anthropic/claude-3.5-sonnet',
-      anthropic: 'claude-3-5-sonnet-20241022',
-      gemini: 'gemini-2.5-pro-preview-03-25'
-    };
+    while (true) {
+      // Get action
+      const { action } = await inquirer.prompt([{
+        type: 'list',
+        name: 'action',
+        message: 'Choose action:',
+        choices: [
+          'Configure Mother Agent',
+          'Configure Scenario Agent',
+          'Remove Provider',
+          'Exit'
+        ]
+      }]);
+
+      if (action === 'Exit') {
+        process.exit(0);
+      }
+
+      if (action === 'Remove Provider') {
+        const { host } = await inquirer.prompt([{
+          type: 'list',
+          name: 'host',
+          message: 'Choose provider to remove:',
+          choices: Object.keys(defaultModels)
+        }]);
+
+        const parsedHost = LlmHostSchema.parse(host);
+        await removeProviderConfig(configPaths, parsedHost);
+        console.log(chalk.green('✔ Removed provider configuration'));
+        continue;
+      }
+
+      // Configure agent
+      const agentType = action === 'Configure Mother Agent' ? 'mother' : 'scenario';
+      let apiKey = '';
+      let isValidKey = false;
+
+      while (!isValidKey) {
+        const { host } = await inquirer.prompt([{
+          type: 'list',
+          name: 'host',
+          message: `Choose LLM provider for ${agentType} agent:`,
+          choices: Object.keys(defaultModels)
+        }]);
+
+        const parsedHost = LlmHostSchema.parse(host);
+
+        const { model } = await inquirer.prompt([{
+          type: 'input',
+          name: 'model',
+          message: chalk.dim(`Enter model (default is ${defaultModels[parsedHost].split('/').pop()})`),
+          default: defaultModels[parsedHost]
+        }]);
+
+        const result = await inquirer.prompt([{
+          type: 'password',
+          name: 'apiKey',
+          message: `Enter your ${host.toUpperCase()}_API_KEY:`
+        }]);
+        apiKey = result.apiKey;
+
+        // Show API key preview
+        console.log(chalk.dim(`API key preview: ${apiKey.substring(0, 8)}...`));
+        const { confirmKey } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'confirmKey',
+          message: 'Is this API key correct?',
+          default: true
+        }]);
+
+        if (!confirmKey) {
+          const { retry } = await inquirer.prompt([{
+            type: 'confirm',
+            name: 'retry',
+            message: 'Would you like to try again?',
+            default: true
+          }]);
+          if (!retry) {
+            throw new Error('API key confirmation failed. Please try again.');
+          }
+          continue;
+        }
+
+        await updateAgentConfig(configPaths, agentType, parsedHost, model, apiKey);
+        console.log(chalk.green(`✔ Updated ${agentType} agent configuration`));
+        console.log(chalk.blue('\nNext steps:'));
+        console.log('1. Restart your MCP client (Cline/Claude Desktop)');
+        console.log('2. Run npx deebo-doctor to verify the installation');
+        isValidKey = true;
+      }
+    }
+  } catch (error) {
+    console.error(chalk.red('\n✖ Provider management failed:'));
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+async function main() {
+  try {
+    process.stdout.write('\u001b[2J\u001b[0;0H'); // Clear console
+    console.log(chalk.blue('==== Deebo Setup ====\n'));
+    
+    // Check prerequisites
+    await checkPrerequisites();
+
+    // Find config paths
+    const configPaths = await findConfigPaths();
 
     // Get Mother agent configuration
     const { motherHost } = await inquirer.prompt([{
@@ -62,24 +180,55 @@ async function main() {
       default: defaultModels[parsedScenarioHost]
     }]);
 
-    // Get API key
-    const { apiKey } = await inquirer.prompt([{
-      type: 'password',
-      name: 'apiKey',
-      message: `Enter your ${motherHost.toUpperCase()}_API_KEY:`
-    }]);
+    // Get API keys
+    let motherApiKey = '';
+    let scenarioApiKey = '';
+    let isValidKey = false;
 
-    // Show API key preview
-    console.log(chalk.dim(`API key preview: ${apiKey.substring(0, 8)}...`));
-    const { confirmKey } = await inquirer.prompt([{
-      type: 'confirm',
-      name: 'confirmKey',
-      message: 'Is this API key correct?',
-      default: true
-    }]);
+    while (!isValidKey) {
+      const { apiKey: mKey } = await inquirer.prompt([{
+        type: 'password',
+        name: 'apiKey',
+        message: `Enter your ${motherHost.toUpperCase()}_API_KEY:`
+      }]);
+      motherApiKey = mKey;
 
-    if (!confirmKey) {
-      throw new Error('API key confirmation failed. Please try again.');
+      // Show API key preview
+      console.log(chalk.dim(`Mother API key preview: ${motherApiKey.substring(0, 8)}...`));
+
+      if (scenarioHost !== motherHost) {
+        const { apiKey: sKey } = await inquirer.prompt([{
+          type: 'password',
+          name: 'apiKey',
+          message: `Enter your ${scenarioHost.toUpperCase()}_API_KEY:`
+        }]);
+        scenarioApiKey = sKey;
+        console.log(chalk.dim(`Scenario API key preview: ${scenarioApiKey.substring(0, 8)}...`));
+      } else {
+        scenarioApiKey = motherApiKey;
+        console.log(chalk.dim(`Using same API key for scenario agent`));
+      }
+
+      const { confirmKey } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'confirmKey',
+        message: 'Are these API keys correct?',
+        default: true
+      }]);
+
+      if (!confirmKey) {
+        const { retry } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'retry',
+          message: 'Would you like to try again?',
+          default: true
+        }]);
+        if (!retry) {
+          throw new Error('API key confirmation failed. Please try again.');
+        }
+        continue;
+      }
+      isValidKey = true;
     }
 
     // Setup paths
@@ -95,7 +244,8 @@ async function main() {
       motherModel,
       scenarioHost: parsedScenarioHost,
       scenarioModel,
-      apiKey,
+      motherApiKey,
+      scenarioApiKey,
       clineConfigPath: configPaths.cline,
       claudeConfigPath: configPaths.claude
     };
@@ -117,4 +267,5 @@ async function main() {
   }
 }
 
-main();
+// In ES modules, we don't need this check
+// The code is already set up to run main() or manageProviders() based on args

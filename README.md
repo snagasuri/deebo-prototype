@@ -10,7 +10,7 @@
          src="https://img.shields.io/npm/v/deebo-setup?color=cb3837">
   </a>
   <img alt="active installs"
-       src="https://img.shields.io/endpoint?url=https://deebo-active-counter.ramnag2003.workers.dev/active&maxAge=0">
+       src="https://img.shields.io/endpoint?url=https://deebo-active-counter.ramnag2003.workers.dev/active">
 </p>
 
 Deebo is an autonomous debugging system that works alongside AI coding agents (Claude, Cline, Cursor, etc.) to solve complex bugs. It runs parallel experiments in isolated Git branches and delivers validated fixes in parallel.
@@ -42,8 +42,8 @@ That's it! Follow the prompts to configure your API key and you're ready to go.
 After installation, you can:
 
 ```bash
-npx deebo-setup providers  # manage your LLM providers
-npx deebo-setup ping      # show us you're alive
+deebo-setup providers  # manage your LLM providers
+deebo-setup ping      # show us you're alive
 ```
 
 The providers command allows you to:

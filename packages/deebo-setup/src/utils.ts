@@ -50,13 +50,22 @@ export async function findConfigPaths(): Promise<{cline?: string, claude?: strin
     throw new Error('APPDATA environment variable not set');
   }
   
-  let clinePath = isWindows
-    ? join(process.env.APPDATA!, 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json')
-    : join(home, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json');
-  
-  let claudePath = isWindows
-    ? join(process.env.APPDATA!, 'Claude', 'claude_desktop_config.json')
-    : join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+  // Windows needs special care with APPDATA
+  let clinePath;
+  let claudePath;
+  if (isWindows) {
+    const appData = process.env.APPDATA;
+    if (!appData) {
+      throw new Error('APPDATA environment variable is not set');
+    }
+    // Normalize Windows paths
+    clinePath = join(appData, 'Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json').replace(/\\/g, '/');
+    claudePath = join(appData, 'Claude/claude_desktop_config.json').replace(/\\/g, '/');
+  } else {
+    // Mac paths unchanged
+    clinePath = join(home, 'Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json');
+    claudePath = join(home, 'Library/Application Support/Claude/claude_desktop_config.json');
+  }
 
   const result: {cline?: string, claude?: string} = {};
 

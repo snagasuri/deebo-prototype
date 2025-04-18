@@ -150,20 +150,11 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
   } catch (error) {
     console.error(chalk.yellow('⚠ Warning: Failed to install desktop-commander'));
     console.error(chalk.yellow('This is not a critical error. Deebo can still function.'));
+    // Note: If desktop-commander fails, subsequent steps might also have issues.
+    // Consider if a more critical error handling is needed here.
   }
 
-  // Ensure server-filesystem is accessible (needed for Windows fallback)
-  try {
-    if (process.platform === 'win32') {
-      console.log(chalk.blue('Verifying @modelcontextprotocol/server-filesystem accessibility...'));
-      // Just check if npx can find it, no setup command needed for this one
-      execSync('npx @modelcontextprotocol/server-filesystem --version', { cwd: config.deeboPath, stdio: 'ignore' });
-      console.log(chalk.green('✔ Verified @modelcontextprotocol/server-filesystem accessibility'));
-    }
-  } catch (error) {
-      // Log a warning but don't fail the install, as it's only needed for the Windows fallback
-      console.warn(chalk.yellow('⚠ Warning: Could not verify @modelcontextprotocol/server-filesystem accessibility. Filesystem operations might fail on Windows if desktop-commander is unavailable.'));
-  }
+  // Removed the check for server-filesystem accessibility
 
   try {
     // Install git-mcp

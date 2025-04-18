@@ -20,18 +20,15 @@ interface LlmConfig {
  * Generates the mother agent's system prompt with the given parameters
  */
 export function getMotherAgentPrompt(useMemoryBank: boolean, memoryBankPath: string): string {
-  const isWindows = process.platform === 'win32';
-  const filesystemToolName = isWindows ? 'filesystem' : 'desktopCommander';
-  const filesystemServerName = isWindows ? 'filesystem' : 'desktop-commander'; // Server name used in <server_name> tag
+  // Always use desktop-commander tools and names
+  const filesystemToolName = 'desktopCommander';
+  const filesystemServerName = 'desktop-commander';
 
-  // Define tool descriptions based on platform
-  let filesystemToolDescriptions = '';
-  if (isWindows) {
-    // Tools for @modelcontextprotocol/server-filesystem
-    filesystemToolDescriptions = `
-filesystem (use ONLY for non-git operations):
+  // Always use desktop-commander tool descriptions
+  const filesystemToolDescriptions = `
+desktop-commander (use ONLY for non-git operations):
 
-Filesystem Tools:
+Terminal Tools:
 - read_file: Read file contents
   Example:
   <use_mcp_tool>
@@ -121,23 +118,6 @@ Filesystem Tools:
   </use_mcp_tool>
 
 - get_file_info: Get file metadata
-  Example:
-  <use_mcp_tool>
-    <server_name>${filesystemServerName}</server_name>
-    <tool_name>get_file_info</tool_name>
-    <arguments>
-      {
-        "path": "file.ts"
-      }
-    </arguments>
-  </use_mcp_tool>
-`;
-  } else {
-    // Tools for @wonderwhy-er/desktop-commander (non-Windows)
-    filesystemToolDescriptions = `
-desktop-commander (use ONLY for non-git operations):
-
-Terminal Tools:
 - execute_command: Run terminal commands with timeout
   Example:
   <use_mcp_tool>
@@ -361,7 +341,6 @@ Filesystem Tools:
     </arguments>
   </use_mcp_tool>
 `;
-  }
 
   return `You are the mother agent in an OODA loop debugging investigation. Your core mission:
 
@@ -456,8 +435,8 @@ git-mcp (use for ALL git operations):
 ${filesystemToolDescriptions}
 
 IMPORTANT MEMORY BANK WARNINGS:
-- DO NOT use write_file on memory bank files - use ${filesystemToolName} ${isWindows ? '' : 'edit_file '}instead (if available) or read/write carefully.
-- Only edit memory bank through ${filesystemToolName} ${isWindows ? '' : 'edit_file '}(if available) to avoid overwrites.
+- DO NOT use write_file on memory bank files - use ${filesystemToolName} edit_file instead (if available) or read/write carefully.
+- Only edit memory bank through ${filesystemToolName} edit_file (if available) to avoid overwrites.
 - Always use ${memoryBankPath} as absolute path for memory bank files`;
 }
 
@@ -470,22 +449,19 @@ export function getScenarioAgentPrompt(args: {
   context: string;
   repoPath: string;
 }): string {
-  const isWindows = process.platform === 'win32';
-  const filesystemToolName = isWindows ? 'filesystem' : 'desktopCommander';
-  const filesystemServerName = isWindows ? 'filesystem' : 'desktop-commander';
+  // Always use desktop-commander tools and names
+  const filesystemToolName = 'desktopCommander';
+  const filesystemServerName = 'desktop-commander';
   
   // We need to check if memoryBankPath is used in the prompt for scenario agent
   // Since it's not passed as parameter, we'll need a default/placeholder value
-  const memoryBankPath = `${args.repoPath}/memory-bank`;
+  const memoryBankPath = `${args.repoPath}/memory-bank`; // This path seems unused in the final prompt string below, but keeping the variable definition for now.
 
-  // Define tool descriptions based on platform
-  let filesystemToolDescriptions = '';
-  if (isWindows) {
-    // Tools for @modelcontextprotocol/server-filesystem
-    filesystemToolDescriptions = `
-filesystem (use ONLY for non-git operations):
+  // Always use desktop-commander tool descriptions
+  const filesystemToolDescriptions = `
+desktop-commander (use ONLY for non-git operations):
 
-Filesystem Tools:
+Terminal Tools:
 - read_file: Read file contents
   Example:
   <use_mcp_tool>
@@ -597,17 +573,6 @@ Filesystem Tools:
         "pattern": "function",
         "filePattern": "*.ts",
         "contextLines": 2,
-        "ignoreCase": true
-      }
-    </arguments>
-  </use_mcp_tool>
-`;
-  } else {
-    // Tools for @wonderwhy-er/desktop-commander (non-Windows)
-    filesystemToolDescriptions = `
-desktop-commander (use ONLY for non-git operations):
-
-Terminal Tools:
 - execute_command: Run terminal commands with timeout
   Example:
   <use_mcp_tool>
@@ -831,7 +796,6 @@ Filesystem Tools:
     </arguments>
   </use_mcp_tool>
 `;
-  }
 
   return `You are a scenario agent investigating a bug based on a specific hypothesis.
 A dedicated Git branch '${args.branch}' has been created for your investigation.

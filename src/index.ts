@@ -73,34 +73,17 @@ async function findToolPaths() {
   process.env.DEEBO_NPX_PATH = npxPath;
   process.env.DEEBO_UVX_PATH = uvxPath;
 
-  // Determine filesystem tool based on platform
-  // const isWindows = process.platform === 'win32'; // Already declared above in this function scope
-  let filesystemToolConfig;
-  let filesystemToolName;
+  // Reverted: Always configure desktopCommander regardless of platform
+  const filesystemToolName = "desktopCommander";
+  const filesystemToolConfig = {
+    command: "{npxPath}", // Assumes npx is found
+    args: ["@wonderwhy-er/desktop-commander"]
+  };
 
-  if (isWindows) {
-    // Use server-filesystem on Windows
-    filesystemToolName = "filesystem"; // Use a generic name
-    filesystemToolConfig = {
-      command: "{npxPath}", // Assumes npx is found
-      args: ["@modelcontextprotocol/server-filesystem", DEEBO_ROOT] // Pass DEEBO_ROOT as allowed path
-      // Note: server-filesystem might need specific allowed paths.
-      // For simplicity, allowing access to the whole .deebo directory.
-      // This might need refinement based on security/needs.
-    };
-  } else {
-    // Use desktop-commander on non-Windows
-    filesystemToolName = "desktopCommander";
-    filesystemToolConfig = {
-      command: "{npxPath}", // Assumes npx is found
-      args: ["@wonderwhy-er/desktop-commander"]
-    };
-  }
-
-  // Write tools.json with placeholders and platform-specific filesystem tool
+  // Write tools.json with placeholders, always using desktopCommander
   const toolsConfig = {
     tools: {
-      [filesystemToolName]: filesystemToolConfig, // Dynamic key for filesystem tool
+      [filesystemToolName]: filesystemToolConfig, // Use desktopCommander key
       "git-mcp": {
         command: "{uvxPath}", // Use placeholder found earlier
         args: ["mcp-server-git", "--repository", "{repoPath}"],

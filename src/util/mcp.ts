@@ -22,24 +22,19 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
     const config = JSON.parse(await readFile(join(DEEBO_ROOT, 'config', 'tools.json'), 'utf-8'));
     let toolConfig = { ...config.tools[toolName] };
     
-    // Check if we should use Windows fallback
+    // Check if we should use Windows fallback for git-mcp
     const isWindows = process.platform === 'win32';
-    if (isWindows && toolConfig.windowsFallback) {
-      // First try to check if the primary tool is available
+    if (isWindows && toolName === 'git-mcp' && toolConfig.windowsFallback) {
+      // First try to check if the primary tool (uvx) is available
       try {
-        // Just check if uvx exists for git-mcp
-        if (toolName === 'git-mcp' && !process.env.DEEBO_UVX_PATH) {
-          // Try to find uvx in PATH
+        // Check if DEEBO_UVX_PATH is set and valid, otherwise try finding uvx in PATH
+        if (!process.env.DEEBO_UVX_PATH || process.env.DEEBO_UVX_PATH === 'uvx') {
           const { execSync } = await import('child_process');
-          try {
-            execSync('uvx --version', { stdio: 'ignore' });
-          } catch {
-            console.log(`Using windowsFallback for ${toolName} because uvx is not available`);
-            toolConfig = { ...toolConfig.windowsFallback };
-          }
+          execSync('uvx --version', { stdio: 'ignore' }); // Throws if uvx not found
         }
+        // If we reach here, uvx is likely available, so don't use fallback
       } catch (error) {
-        console.log(`Error checking for primary tool, using windowsFallback: ${error}`);
+        console.log(`uvx not found or DEEBO_UVX_PATH not set, using windowsFallback for ${toolName}`);
         toolConfig = { ...toolConfig.windowsFallback };
       }
     }
@@ -51,8 +46,8 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
     
     // Replace placeholders in command
     toolConfig.command = toolConfig.command
-      .replace(/{npxPath}/g, process.env.DEEBO_NPX_PATH || '')
-      .replace(/{uvxPath}/g, process.env.DEEBO_UVX_PATH || '');
+      .replace(/{npxPath}/g, process.env.DEEBO_NPX_PATH || 'npx') // Provide default 'npx'
+      .replace(/{uvxPath}/g, process.env.DEEBO_UVX_PATH || 'uvx'); // Provide default 'uvx'
 
     // Replace placeholders in arguments  
     toolConfig.args = toolConfig.args.map((arg: string) =>
@@ -84,18 +79,17 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
 
 export async function connectRequiredTools(agentName: string, sessionId: string, repoPath: string): Promise<{
   gitClient: Client;
-  filesystemClient: Client; // Keep generic name, but it connects to different tools
+  filesystemClient: Client;
 }> {
-  const isWindows = process.platform === 'win32';
-  const filesystemToolName = isWindows ? 'filesystem' : 'desktopCommander';
-  const filesystemAgentName = isWindows ? `${agentName}-filesystem` : `${agentName}-desktop-commander`;
+  // Reverted: Always use desktopCommander
+  const filesystemToolName = 'desktopCommander';
+  const filesystemAgentName = `${agentName}-desktop-commander`;
 
-  await log(sessionId, agentName.startsWith('mother') ? 'mother' : `scenario-${sessionId}`, 'debug', `Connecting filesystem tool: ${filesystemToolName} (Platform: ${process.platform})`, { repoPath });
-
+  await log(sessionId, agentName.startsWith('mother') ? 'mother' : `scenario-${sessionId}`, 'debug', `Connecting filesystem tool: ${filesystemToolName}`, { repoPath });
 
   const [gitClient, filesystemClient] = await Promise.all([
     connectMcpTool(`${agentName}-git`, 'git-mcp', sessionId, repoPath),
-    connectMcpTool(filesystemAgentName, filesystemToolName, sessionId, repoPath) // Connect to platform-specific tool
+    connectMcpTool(filesystemAgentName, filesystemToolName, sessionId, repoPath) // Always connect to desktopCommander
   ]);
 
   return { gitClient, filesystemClient }; // Return the connected clients

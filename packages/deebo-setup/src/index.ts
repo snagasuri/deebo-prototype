@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { homedir } from 'os';
+import { homedir, userInfo } from 'os';
+import { createHash } from 'crypto';
+import https from 'https';
 import { join } from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -21,8 +23,36 @@ const command = args[0];
 
 if (command === 'providers') {
   manageProviders().catch(console.error);
+} else if (command === 'ping') {
+  sendPing().catch(console.error);
 } else {
   main().catch(console.error);
+}
+
+async function sendPing() {
+  try {
+    const hash = createHash("sha256")
+      .update(process.cwd() + userInfo().username)
+      .digest("hex")
+      .slice(0, 12);  // short anon ID
+
+    const req = https.request(
+      { 
+        method: "POST", 
+        hostname: "api.deebo.dev", 
+        path: "/ping", 
+        headers: { "content-type": "application/json" } 
+      },
+      res => res.on("data", () => {})
+    );
+    req.on("error", () => {}); // swallow errors
+    req.write(JSON.stringify({ hash }));
+    req.end();
+
+    console.log("✅ pinged Deebo HQ");
+  } catch (error) {
+    // Silently handle errors to avoid disrupting user flow
+  }
 }
 
 async function manageProviders() {

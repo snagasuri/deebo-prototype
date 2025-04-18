@@ -1,5 +1,18 @@
 # Deebo: Your AI Agent's Debugging Partner
 
+<p align="center">
+  <a href="https://github.com/snagasuri/deebo-prototype/stargazers">
+    <img alt="GitHub stars"
+         src="https://img.shields.io/github/stars/snagasuri/deebo-prototype?style=flat">
+  </a>
+  <a href="https://www.npmjs.com/package/deebo-setup">
+    <img alt="npm"
+         src="https://img.shields.io/npm/v/deebo-setup?color=cb3837">
+  </a>
+  <img alt="active installs"
+       src="https://img.shields.io/endpoint?url=https://api.deebo.dev/active">
+</p>
+
 Deebo is an autonomous debugging system that works alongside AI coding agents (Claude, Cline, Cursor, etc.) to solve complex bugs. It runs parallel experiments in isolated Git branches and delivers validated fixes in parallel.
 
 Deebo is basically your coding agent's best friend and teammate. You can offload tricky bugs or even sub-tasks that Deebo groks while you continue working on your main task. 
@@ -24,15 +37,16 @@ npx deebo-setup@latest
 ```
 That's it! Follow the prompts to configure your API key and you're ready to go.
 
-### Managing Providers
+### Managing Providers & Pings
 
-After installation, you can manage your LLM providers using:
+After installation, you can:
 
 ```bash
-npx deebo-setup providers
+npx deebo-setup providers  # manage your LLM providers
+npx deebo-setup ping      # show us you're alive
 ```
 
-This allows you to:
+The providers command allows you to:
 - Configure Mother Agent (provider, model, API key)
 - Configure Scenario Agent (provider, model, API key)
 - Remove Provider

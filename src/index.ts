@@ -57,34 +57,8 @@ async function findToolPaths() {
     // Store paths in env for mcp.ts to use
     process.env.DEEBO_NPX_PATH = npxPath;
     process.env.DEEBO_UVX_PATH = uvxPath;
-
-    // Write tools.json
-    const toolsConfig = {
-      tools: {
-        "desktopCommander": {
-          command: npxPath,
-          args: ["@wonderwhy-er/desktop-commander"]
-        },
-        "git-mcp": {
-          command: uvxPath,
-          args: ["mcp-server-git", "--repository", "{repoPath}"],
-          windowsFallback: {
-            command: "python",
-            args: [
-              "-m",
-              "mcp_server_git",
-              "--repository",
-              "{repoPath}"
-            ]
-          }
-        }
-      }
-    };
-
-  await writeFile(join(DEEBO_ROOT, 'config', 'tools.json'), 
-    JSON.stringify(toolsConfig, null, 2));
-
-  return { npxPath, uvxPath };
+    
+    return { npxPath, uvxPath };
   } catch (error) {
     console.error('Error finding tool paths:', error);
     // Set fallback values

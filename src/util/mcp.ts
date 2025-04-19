@@ -44,10 +44,14 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
     const memoryPath = join(DEEBO_ROOT, 'memory-bank', projectId);
     const memoryRoot = join(DEEBO_ROOT, 'memory-bank');
     
-    // Replace placeholders in command
+    // Replace placeholders in command with basic commands on Mac/Linux for better compatibility
     toolConfig.command = toolConfig.command
-      .replace(/{npxPath}/g, process.env.DEEBO_NPX_PATH || (process.platform === 'win32' ? 'npx.cmd' : 'npx'))
-      .replace(/{uvxPath}/g, process.env.DEEBO_UVX_PATH || (process.platform === 'win32' ? 'uvx.cmd' : 'uvx'));
+      .replace(/{npxPath}/g, process.platform === 'win32' ? 
+        (process.env.DEEBO_NPX_PATH || 'npx.cmd') : 
+        'npx')
+      .replace(/{uvxPath}/g, process.platform === 'win32' ? 
+        (process.env.DEEBO_UVX_PATH || 'uvx.cmd') : 
+        'uvx');
 
     // Replace placeholders in arguments  
     toolConfig.args = toolConfig.args.map((arg: string) =>

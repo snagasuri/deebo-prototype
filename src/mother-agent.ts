@@ -209,7 +209,14 @@ ${responseText}
             '--branch', branchName
           ];
 
-          const child = spawn('node', scenarioArgs); // Spawn the process
+          // Spawn process with tool path environment variables
+          const child = spawn('node', scenarioArgs, {
+            env: {
+              ...process.env,
+              DEEBO_NPX_PATH: process.env.DEEBO_NPX_PATH,
+              DEEBO_UVX_PATH: process.env.DEEBO_UVX_PATH
+            }
+          }); // Ensure tool paths are passed to scenarios
           let output = '';
 
           // Track the PID in the shared Set

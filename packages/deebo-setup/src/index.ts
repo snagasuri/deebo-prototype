@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { homedir } from 'os';
+import { homedir, userInfo } from 'os';
+import { createHash } from 'crypto';
+import https from 'https';
 import { join } from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -9,25 +11,41 @@ import {
   findConfigPaths,
   setupDeeboDirectory,
   writeEnvFile,
-  updateMcpConfig
+  updateMcpConfig,
+  defaultModels
 } from './utils.js';
+
+// Optional ping for analytics
+async function sendPing() {
+  try {
+    const hash = createHash("sha256")
+      .update(process.cwd() + userInfo().username)
+      .digest("hex")
+      .slice(0, 12);
+
+    const req = https.request({
+      method: "POST",
+      hostname: "deebo-active-counter.ramnag2003.workers.dev",
+      path: "/ping",
+      headers: { "content-type": "application/json" }
+    }, res => res.on("data", () => {}));
+    
+    req.on("error", () => {});
+    req.write(JSON.stringify({ hash }));
+    req.end();
+  } catch (error) {}
+}
 
 async function main() {
   try {
-    // Check prerequisites
+    process.stdout.write('\\u001b[2J\\u001b[0;0H');
+    console.log(chalk.blue('==== Deebo Setup ====\
+'));
+    
     await checkPrerequisites();
-
-    // Find config paths
     const configPaths = await findConfigPaths();
 
-    // Get Mother agent configuration
-    const defaultModels: Record<string, string> = {
-      openrouter: 'anthropic/claude-3.5-sonnet',
-      anthropic: 'claude-3-sonnet-20240229',
-      gemini: 'gemini-1.5-pro'
-    };
-
-    // Get Mother agent configuration
+    // Get Mother agent config
     const { motherHost } = await inquirer.prompt([{
       type: 'list',
       name: 'motherHost',
@@ -40,15 +58,15 @@ async function main() {
     const { motherModel } = await inquirer.prompt([{
       type: 'input',
       name: 'motherModel',
-      message: `Enter model for Mother agent (press Enter for ${defaultModels[parsedMotherHost]}):`,
+      message: chalk.dim(`Enter model (default is ${defaultModels[parsedMotherHost].split('/').pop()})`),
       default: defaultModels[parsedMotherHost]
     }]);
 
-    // Get Scenario agent configuration
+    // Get Scenario agent config
     const { scenarioHost } = await inquirer.prompt([{
       type: 'list',
       name: 'scenarioHost',
-      message: 'Choose LLM host for Scenario agents (press Enter to use same as Mother):',
+      message: 'Choose LLM host for Scenario agents:',
       choices: Object.keys(defaultModels),
       default: parsedMotherHost
     }]);
@@ -58,36 +76,37 @@ async function main() {
     const { scenarioModel } = await inquirer.prompt([{
       type: 'input',
       name: 'scenarioModel',
-      message: `Enter model for Scenario agents (press Enter for ${defaultModels[parsedScenarioHost]}):`,
+      message: chalk.dim(`Enter model (default is ${defaultModels[parsedScenarioHost].split('/').pop()})`),
       default: defaultModels[parsedScenarioHost]
     }]);
 
-    // Get API key
-    const { apiKey } = await inquirer.prompt([{
+    // Get API keys
+    let motherApiKey = '';
+    let scenarioApiKey = '';
+
+    const { apiKey: mKey } = await inquirer.prompt([{
       type: 'password',
       name: 'apiKey',
       message: `Enter your ${motherHost.toUpperCase()}_API_KEY:`
     }]);
+    motherApiKey = mKey;
 
-    // Show API key preview
-    console.log(chalk.dim(`API key preview: ${apiKey.substring(0, 8)}...`));
-    const { confirmKey } = await inquirer.prompt([{
-      type: 'confirm',
-      name: 'confirmKey',
-      message: 'Is this API key correct?',
-      default: true
-    }]);
-
-    if (!confirmKey) {
-      throw new Error('API key confirmation failed. Please try again.');
+    if (scenarioHost !== motherHost) {
+      const { apiKey: sKey } = await inquirer.prompt([{
+        type: 'password',
+        name: 'apiKey',
+        message: `Enter your ${scenarioHost.toUpperCase()}_API_KEY:`
+      }]);
+      scenarioApiKey = sKey;
+    } else {
+      scenarioApiKey = motherApiKey;
     }
 
-    // Setup paths
+    // Setup paths and config
     const home = homedir();
     const deeboPath = join(home, '.deebo');
     const envPath = join(deeboPath, '.env');
 
-    // Create config object
     const config = {
       deeboPath,
       envPath,
@@ -95,26 +114,30 @@ async function main() {
       motherModel,
       scenarioHost: parsedScenarioHost,
       scenarioModel,
-      apiKey,
+      motherApiKey,
+      scenarioApiKey,
       clineConfigPath: configPaths.cline,
       claudeConfigPath: configPaths.claude
     };
 
-    // Setup Deebo
     await setupDeeboDirectory(config);
     await writeEnvFile(config);
     await updateMcpConfig(config);
+    await sendPing().catch(() => {});
 
-    console.log(chalk.green('\n✔ Deebo installation complete!'));
-    console.log(chalk.blue('\nNext steps:'));
+    console.log(chalk.green('\
+✔ Deebo installation complete!'));
+    console.log(chalk.blue('\
+Next steps:'));
     console.log('1. Restart your MCP client (Cline/Claude Desktop)');
     console.log('2. Run npx deebo-doctor to verify the installation');
     
   } catch (error) {
-    console.error(chalk.red('\n✖ Installation failed:'));
+    console.error(chalk.red('\
+✖ Installation failed:'));
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
 
-main();
+main().catch(console.error);

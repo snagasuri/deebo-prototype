@@ -6,10 +6,25 @@ import chalk from 'chalk';
 import { simpleGit as createGit } from 'simple-git';
 import inquirer from 'inquirer';
 
+// Keep only essential defaults
+export const defaultModels = {
+  openrouter: 'anthropic/claude-3.5-sonnet',
+  anthropic: 'claude-3-5-sonnet-20241022',
+  gemini: 'gemini-2.5-pro-preview-03-25'
+};
+
 export const DEEBO_REPO = 'https://github.com/snagasuri/deebo-prototype.git';
 
+function getApiKeyEnvVar(host: string): string {
+  switch (host) {
+    case 'openrouter': return 'OPENROUTER_API_KEY';
+    case 'anthropic': return 'ANTHROPIC_API_KEY';
+    case 'gemini': return 'GEMINI_API_KEY';
+    default: return 'OPENROUTER_API_KEY';
+  }
+}
+
 export async function checkPrerequisites(): Promise<void> {
-  // Check Node version
   const nodeVersion = process.version;
   if (nodeVersion.startsWith('v18') || nodeVersion.startsWith('v20') || nodeVersion.startsWith('v22')) {
     console.log(chalk.green('✔ Node version:', nodeVersion));
@@ -17,7 +32,6 @@ export async function checkPrerequisites(): Promise<void> {
     throw new Error('Node.js v18+ is required');
   }
 
-  // Check git
   try {
     const git = createGit();
     await git.version();
@@ -31,28 +45,38 @@ export async function findConfigPaths(): Promise<{cline?: string, claude?: strin
   const home = homedir();
   const isWindows = process.platform === 'win32';
   
-  const paths = isWindows ? {
-    cline: join(process.env.APPDATA || '', 'Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json'),
-    claude: join(process.env.APPDATA || '', 'Claude/claude_desktop_config.json')
-  } : {
-    cline: join(home, 'Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json'),
-    claude: join(home, 'Library/Application Support/Claude/claude_desktop_config.json')
-  };
+  // Validate APPDATA on Windows
+  if (isWindows && !process.env.APPDATA) {
+    throw new Error('APPDATA environment variable not set');
+  }
+  
+  // Windows needs special care with APPDATA
+  let clinePath;
+  let claudePath;
+  if (isWindows) {
+    const appData = process.env.APPDATA;
+    if (!appData) {
+      throw new Error('APPDATA environment variable is not set');
+    }
+    // Normalize Windows paths
+    clinePath = join(appData, 'Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json').replace(/\\/g, '/');
+    claudePath = join(appData, 'Claude/claude_desktop_config.json').replace(/\\/g, '/');
+  } else {
+    // Mac paths unchanged
+    clinePath = join(home, 'Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json');
+    claudePath = join(home, 'Library/Application Support/Claude/claude_desktop_config.json');
+  }
 
   const result: {cline?: string, claude?: string} = {};
 
   try {
-    await access(paths.cline);
-    result.cline = paths.cline;
+    await access(clinePath);
+    result.cline = clinePath;
     console.log(chalk.green('✔ Cline config found'));
   } catch {}
 
-  try {
-    await access(paths.claude);
-    result.claude = paths.claude;
-    console.log(chalk.green('✔ Claude Desktop config found'));
-  } catch {}
-
+  result.claude = claudePath;
+  
   if (!result.cline && !result.claude) {
     throw new Error('No Cline or Claude Desktop configuration found');
   }
@@ -61,14 +85,10 @@ export async function findConfigPaths(): Promise<{cline?: string, claude?: strin
 }
 
 export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
-  let needsCleanup = false;
-
-  try {
-    await access(config.deeboPath);
-    // Directory exists, ask for confirmation
+  if (await access(config.deeboPath).then(() => true).catch(() => false)) {
     const { confirm } = await inquirer.prompt([{
       type: 'confirm',
-      name: 'confirm',
+      name: 'confirm', 
       message: 'Deebo is already installed. Update to latest version?',
       default: true
     }]);
@@ -78,45 +98,46 @@ export async function setupDeeboDirectory(config: SetupConfig): Promise<void> {
       process.exit(0);
     }
 
-    needsCleanup = true;
-  } catch (err) {
-    // Directory doesn't exist, create it
-    await mkdir(config.deeboPath, { recursive: true });
-  }
-
-  // Clean up if needed
-  if (needsCleanup) {
     const { rm } = await import('fs/promises');
+    console.log(chalk.yellow('Removing existing installation...'));
     await rm(config.deeboPath, { recursive: true, force: true });
-    console.log(chalk.green('✔ Removed existing installation'));
-    await mkdir(config.deeboPath, { recursive: true });
+    // Wait a bit for filesystem to catch up
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log(chalk.green('✔ Cleaned up old installation'));
   }
 
-  console.log(chalk.green('✔ Created Deebo directory'));
+  // Create core directories
+  await mkdir(config.deeboPath, { recursive: true }); 
+  await mkdir(join(config.deeboPath, 'debug'), { recursive: true });
+  await mkdir(join(config.deeboPath, 'memory-bank'), { recursive: true });
+  console.log(chalk.green('✔ Created Deebo directories'));
 
-  // Clone repository
   const git = createGit();
   await git.clone(DEEBO_REPO, config.deeboPath);
   console.log(chalk.green('✔ Cloned Deebo repository'));
 
-  // Install dependencies
   const { execSync } = await import('child_process');
-  execSync('npm install', { cwd: config.deeboPath });
-  console.log(chalk.green('✔ Installed dependencies'));
-
-  // Build project
-  execSync('npm run build', { cwd: config.deeboPath });
-  console.log(chalk.green('✔ Built project'));
+  execSync('npm install && npm run build', { cwd: config.deeboPath, stdio: 'inherit' });
+  console.log(chalk.green('✔ Installed dependencies and built project'));
 }
 
 export async function writeEnvFile(config: SetupConfig): Promise<void> {
-  const envContent = `MOTHER_HOST=${config.motherHost}
+  const motherApiKeyVar = getApiKeyEnvVar(config.motherHost);
+  const scenarioApiKeyVar = getApiKeyEnvVar(config.scenarioHost);
+  
+  const envContent = `# Required System Config
+NODE_ENV=development
+USE_MEMORY_BANK=true
+
+# Mother Agent Config
+MOTHER_HOST=${config.motherHost}
 MOTHER_MODEL=${config.motherModel}
+${motherApiKeyVar}=${config.motherApiKey}
+
+# Scenario Agent Config  
 SCENARIO_HOST=${config.scenarioHost}
 SCENARIO_MODEL=${config.scenarioModel}
-${getApiKeyEnvVar(config.motherHost)}=${config.apiKey}
-USE_MEMORY_BANK=true
-NODE_ENV=development`;
+${scenarioApiKeyVar}=${config.scenarioApiKey}`;
 
   await writeFile(config.envPath, envContent);
   console.log(chalk.green('✔ Created environment file'));
@@ -141,50 +162,61 @@ export async function updateMcpConfig(config: SetupConfig): Promise<void> {
       MOTHER_MODEL: config.motherModel,
       SCENARIO_HOST: config.scenarioHost,
       SCENARIO_MODEL: config.scenarioModel,
-      [getApiKeyEnvVar(config.motherHost)]: config.apiKey
+      [getApiKeyEnvVar(config.motherHost)]: config.motherApiKey,
+      [getApiKeyEnvVar(config.scenarioHost)]: config.scenarioApiKey
     },
     transportType: 'stdio'
   };
 
-  // Update Cline config if available
   if (config.clineConfigPath) {
-    const clineConfig = JSON.parse(await readFile(config.clineConfigPath, 'utf8')) as McpConfig;
-    clineConfig.mcpServers.deebo = deeboConfig;
-    await writeFile(config.clineConfigPath, JSON.stringify(clineConfig, null, 2));
-    console.log(chalk.green('✔ Updated Cline configuration'));
+    try {
+      let clineConfig: McpConfig;
+      try {
+        // Try to read existing config first
+        const content = await readFile(config.clineConfigPath, 'utf8');
+        clineConfig = JSON.parse(content);
+        if (!clineConfig.mcpServers) {
+          clineConfig.mcpServers = {};
+        }
+      } catch {
+        // Only create new config if file doesn't exist or can't be parsed
+        clineConfig = { mcpServers: {} };
+      }
+      
+      // Add/update deebo while preserving other servers
+      clineConfig.mcpServers.deebo = deeboConfig;
+      await writeFile(config.clineConfigPath, JSON.stringify(clineConfig, null, 2));
+      console.log(chalk.green('✔ Updated Cline configuration'));
+    } catch (error) {
+      console.error(chalk.yellow('⚠ Warning: Failed to update Cline configuration'));
+      console.error(error instanceof Error ? error.message : String(error));
+    }
   }
 
-  // Update Claude config if available
   if (config.claudeConfigPath) {
-    const claudeConfig = JSON.parse(await readFile(config.claudeConfigPath, 'utf8')) as McpConfig;
-    claudeConfig.mcpServers.deebo = deeboConfig;
-    await writeFile(config.claudeConfigPath, JSON.stringify(claudeConfig, null, 2));
-    console.log(chalk.green('✔ Updated Claude Desktop configuration'));
-  }
-}
+    try {
+      let claudeConfig: McpConfig;
+      try {
+        // Try to read existing Claude config first
+        const content = await readFile(config.claudeConfigPath, 'utf8');
+        claudeConfig = JSON.parse(content);
+        if (!claudeConfig.mcpServers) {
+          claudeConfig.mcpServers = {};
+        }
+      } catch {
+        // Only create new config if file doesn't exist or can't be parsed
+        claudeConfig = { mcpServers: {} };
+        const claudeDir = config.claudeConfigPath.substring(0, config.claudeConfigPath.lastIndexOf(process.platform === 'win32' ? '\\\\' : '/'));
+        await mkdir(claudeDir, { recursive: true });
+      }
 
-function getDefaultModel(host: string): string {
-  switch (host) {
-    case 'openrouter':
-      return 'anthropic/claude-3.5-sonnet';
-    case 'anthropic':
-      return 'claude-3-sonnet-20240229';
-    case 'gemini':
-      return 'gemini-1.5-pro';
-    default:
-      return 'anthropic/claude-3.5-sonnet';
-  }
-}
-
-function getApiKeyEnvVar(host: string): string {
-  switch (host) {
-    case 'openrouter':
-      return 'OPENROUTER_API_KEY';
-    case 'anthropic':
-      return 'ANTHROPIC_API_KEY';
-    case 'gemini':
-      return 'GEMINI_API_KEY';
-    default:
-      return 'OPENROUTER_API_KEY';
+      // Add/update deebo while preserving other servers
+      claudeConfig.mcpServers.deebo = deeboConfig;
+      await writeFile(config.claudeConfigPath, JSON.stringify(claudeConfig, null, 2));
+      console.log(chalk.green('✔ Created Claude Desktop configuration'));
+    } catch (error) {
+      console.error(chalk.yellow('⚠ Warning: Could not create Claude Desktop configuration'));
+      console.error(chalk.yellow(`Error: ${error instanceof Error ? error.message : String(error)}`));
+    }
   }
 }

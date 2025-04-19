@@ -36,4 +36,5 @@ memory-bank/
 venv/
 notes/todo.md
 TODO.md
-notes/
+
+workers/

@@ -13,23 +13,133 @@ import { promisify } from 'util';
 
 // Function to find tool paths during initialization
 async function findToolPaths() {
-  const npxPath = (await execPromise('which npx')).stdout.trim();
-  const uvxPath = (await execPromise('which uvx')).stdout.trim();
+  // Use 'where' on Windows, 'which' on other platforms
+  const isWindows = process.platform === 'win32';
+  const findCommand = isWindows ? 'where' : 'which';
+  
+  let npxPath = '';
+  let uvxPath = '';
+  
+  try {
+    // Find npx path
+    try {
+      // Get global npm bin directory first
+      const npmBinPath = (await execPromise('npm bin -g')).stdout.trim();
+      
+      if (isWindows) {
+        // Try direct path first
+        const npxCmd = join(npmBinPath, 'npx.cmd');
+        try {
+          await access(npxCmd);
+          npxPath = npxCmd;
+        } catch {
+          // Fallback to where command if direct path fails
+          npxPath = (await execPromise(`${findCommand} npx`)).stdout.trim();
+          if (npxPath.includes('\r\n')) {
+            npxPath = npxPath.split('\r\n')[0].trim();
+          }
+          
+          // If the path contains VSCode, use npm global bin instead
+          if (npxPath.toLowerCase().includes('microsoft vs code')) {
+            npxPath = join(npmBinPath, 'npx.cmd');
+            if (!await access(npxPath).then(() => true).catch(() => false)) {
+              npxPath = 'npx.cmd'; // Final fallback
+            }
+          }
+        }
+      } else {
+        // Mac/Linux path finding unchanged
+        npxPath = (await execPromise(`${findCommand} npx`)).stdout.trim();
+      }
+    } catch (error) {
+      // Fallback for any failures
+      npxPath = isWindows ? 'npx.cmd' : 'npx';
+      console.log('Using default npx command');
+    }
+    
+    // Find uvx path
+    try {
+      if (isWindows) {
+        // Check Python Scripts directory first
+        try {
+          const pythonResult = await execPromise('python -c "import sys; import os; print(os.path.join(sys.prefix, \'Scripts\'))"');
+          const scriptsPath = pythonResult.stdout.trim();
+          const uvxCmd = join(scriptsPath, 'uvx.exe');
+          
+          await access(uvxCmd);
+          uvxPath = uvxCmd;
+        } catch {
+          // Try where command if Scripts path fails
+          try {
+            uvxPath = (await execPromise(`${findCommand} uvx`)).stdout.trim();
+            if (uvxPath.includes('\r\n')) {
+              uvxPath = uvxPath.split('\r\n')[0].trim();
+            }
+            
+            // If path contains VSCode, try python module path
+            if (uvxPath.toLowerCase().includes('microsoft vs code')) {
+              await execPromise('pip show uv');
+              uvxPath = 'python -m uv';
+              console.log('Using Python module path for uv');
+            }
+          } catch {
+            // Last resort - try pip show and use module path
+            try {
+              await execPromise('pip show uv');
+              uvxPath = 'python -m uv';
+              console.log('Using Python module path for uv');
+            } catch {
+              uvxPath = 'uvx';
+              console.log('Using default uvx command');
+            }
+          }
+        }
+      } else {
+        // Mac/Linux path finding
+        uvxPath = (await execPromise(`${findCommand} uvx`)).stdout.trim();
+      }
+    } catch (error) {
+      // Final fallback
+      uvxPath = 'uvx';
+      console.log('Using default uvx command');
+    }
+  } catch (error) {
+    console.error('Error finding tool paths:', error);
+    // Set fallback values if we can't determine paths
+    if (!npxPath) npxPath = 'npx';
+    if (!uvxPath) uvxPath = 'uvx';
+  }
 
   // Store paths in env for mcp.ts to use
   process.env.DEEBO_NPX_PATH = npxPath;
   process.env.DEEBO_UVX_PATH = uvxPath;
 
-  // Write tools.json with placeholders
+  // Reverted: Always configure desktopCommander regardless of platform
+  const filesystemToolName = "desktopCommander";
+  const filesystemToolConfig = {
+    command: "{npxPath}", // Assumes npx is found
+    args: ["@wonderwhy-er/desktop-commander"]
+  };
+
+  // Write tools.json with proper paths for the platform
   const toolsConfig = {
     tools: {
-      desktopCommander: {
-        command: "{npxPath}",
+      [filesystemToolName]: {
+        command: npxPath, // Direct path, no placeholder
         args: ["@wonderwhy-er/desktop-commander"]
       },
       "git-mcp": {
-        command: "{uvxPath}",
-        args: ["mcp-server-git", "--repository", "{repoPath}"]
+        command: uvxPath, // Direct path, no placeholder
+        args: ["mcp-server-git", "--repository", "{repoPath}"],
+        windowsFallback: {
+          command: "python",
+          args: [
+            "-m",
+            "mcp_server_git",
+            "--repository",
+            "{repoPath}"
+          ]
+        }
       }
     }
   };

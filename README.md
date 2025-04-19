@@ -1,19 +1,72 @@
 # Deebo: Your AI Agent's Debugging Partner
 
-Deebo is an autonomous debugging system that works alongside AI coding agents (Claude, Cline, Cursor, etc.) to solve complex bugs. It runs parallel experiments in isolated Git branches and delivers validated fixes—no human intervention needed.
+<p align="center">
+  <a href="https://github.com/snagasuri/deebo-prototype/stargazers">
+    <img alt="GitHub stars"
+         src="https://img.shields.io/github/stars/snagasuri/deebo-prototype?style=flat">
+  </a>
+  <a href="https://www.npmjs.com/package/deebo-setup">
+    <img alt="npm"
+         src="https://img.shields.io/npm/v/deebo-setup?color=cb3837">
+  </a>
+  <img alt="active installs"
+       src="https://img.shields.io/endpoint?url=https://deebo-active-counter.ramnag2003.workers.dev/active">
+</p>
 
-Here's [an example of Deebo solving the test53 linearizer failure $100 tinygrad bug bounty](https://github.com/snagasuri/deebo-prototype/tree/master/memory-bank/9bd38e9840d3/sessions/session-1744006973678) by spawning 17 scenario agents and coming up with 2 valid fixes. Check out [progress.md](https://github.com/snagasuri/deebo-prototype/blob/master/memory-bank/9bd38e9840d3/progress.md) for just the solution.
+Deebo is an autonomous debugging system that works alongside AI coding agents (Claude, Cline, Cursor, etc.) to solve complex bugs. It runs parallel experiments in isolated Git branches and delivers validated fixes in parallel.
+
+Deebo is basically your coding agent's best friend and teammate. You can offload tricky bugs or even sub-tasks that Deebo groks while you continue working on your main task. 
+
+<video width="640" controls>
+  <source src="notes/deebo-demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+https://github.com/user-attachments/assets/e38c8ced-da8f-4979-ab30-50869b07042a
+
+<sub><sup>40‑second sped-up run showing Deebo in action</sup></sub>
+
+Deebo scales to production codebases, too. Here's [an example of Deebo grokking the test53 linearizer failure $100 tinygrad bug bounty](https://github.com/snagasuri/deebo-prototype/tree/master/memory-bank/9bd38e9840d3/sessions/session-1744006973678) by spawning 17 scenario agents and coming up with 2 valid fixes. Check out [progress.md](https://github.com/snagasuri/deebo-prototype/blob/master/memory-bank/9bd38e9840d3/progress.md) for just the solution.
+
+**any questions/problems with installing? DM me on Twitter: [@sriramenn](https://twitter.com/sriramenn)**
 
 ## 🚀 Quick Install (for Cline/Claude Desktop users)
 
 ```bash
-npx deebo-setup
+npx deebo-setup@latest
 ```
 That's it! Follow the prompts to configure your API key and you're ready to go.
 
-Need help? DM me on Twitter: [@sriramenn](https://twitter.com/sriramenn)
+### Managing Providers & Pings
+
+To use the `deebo-setup providers` and `deebo-setup ping` commands directly from your terminal without `npx` each time, install the package globally:
+
+```bash
+npm install -g deebo-setup
+```
+
+Then you can use these commands from anywhere:
+
+```bash
+deebo-setup providers  # manage your LLM providers
+deebo-setup ping      # show us you're alive
+```
 
 <details>
+
+<summary> deebo-setup commands info </summary>
+
+The providers command allows you to:
+- Configure Mother Agent (provider, model, API key)
+- Configure Scenario Agent (provider, model, API key)
+- Remove Provider
+
+You can use different providers for Mother and Scenario agents. For example:
+- Mother Agent: Anthropic with claude-3-sonnet
+- Scenario Agents: OpenRouter with claude-3.5-sonnet
+
+The ping command increments the 'active installs' button to let us know you set up Deebo :) 
+
 <summary>🔍 What exactly does Deebo do?</summary>
 
 Deebo is your AI agent's debugging partner. When your agent encounters a tricky bug, Deebo:
@@ -158,6 +211,7 @@ memory-bank/{codebaseHash}/{session-id-hash}/
 ```
 
 The memory bank allows Deebo to learn from past sessions and personalize to your codebase. Use the context field when starting a debug session to provide relevant information, and add observations mid-session if needed.
+
 
 ### Tool Usage Examples
 ```xml

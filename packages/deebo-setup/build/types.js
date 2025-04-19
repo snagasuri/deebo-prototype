@@ -11,3 +11,4 @@ export const McpConfigSchema = z.object({
         transportType: z.string()
     }))
 });
+export const LlmModelSchema = z.string();

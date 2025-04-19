@@ -80,12 +80,20 @@ async function findToolPaths() {
     args: ["@wonderwhy-er/desktop-commander"]
   };
 
-  // Write tools.json with placeholders, always using desktopCommander
+  // Write tools.json with platform-specific config
   const toolsConfig = {
     tools: {
-      [filesystemToolName]: filesystemToolConfig, // Use desktopCommander key
+      [filesystemToolName]: process.platform === 'win32' 
+        ? {
+            command: "npx.cmd",  // Windows needs .cmd
+            args: ["@wonderwhy-er/desktop-commander"]
+          }
+        : {
+            command: "npx",
+            args: ["@wonderwhy-er/desktop-commander"]
+          },
       "git-mcp": {
-        command: "{uvxPath}", // Use placeholder found earlier
+        command: "{uvxPath}",
         args: ["mcp-server-git", "--repository", "{repoPath}"],
         windowsFallback: {
           command: "python",

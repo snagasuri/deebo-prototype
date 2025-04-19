@@ -53,9 +53,6 @@ async function findToolPaths() {
       uvxPath = (await execPromise('which uvx')).stdout.trim();
     }
     
-    // For debugging - log what paths were found
-    console.log(`Found npxPath: ${npxPath}`);
-    console.log(`Found uvxPath: ${uvxPath}`);
     
     // Store paths in env for mcp.ts to use
     process.env.DEEBO_NPX_PATH = npxPath;

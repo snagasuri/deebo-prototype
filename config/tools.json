@@ -1,13 +1,13 @@
 {
   "tools": {
     "desktopCommander": {
-      "command": "{npxPath}",
+      "command": "/Users/sriram/.nvm/versions/node/v22.14.0/bin/npx",
       "args": [
         "@wonderwhy-er/desktop-commander"
       ]
     },
     "git-mcp": {
-      "command": "{uvxPath}",
+      "command": "/Users/sriram/.local/bin/uvx",
       "args": [
         "mcp-server-git",
         "--repository",

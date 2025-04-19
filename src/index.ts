@@ -11,6 +11,13 @@ import { writeObservation } from './util/observations.js';
 import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 
+// Set up basic directories
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+export const DEEBO_ROOT = join(__dirname, '..');
+
+const execPromise = promisify(exec);
+
 // Function to find tool paths during initialization
 async function findToolPaths() {
   const isWindows = process.platform === 'win32';
@@ -81,9 +88,18 @@ async function findToolPaths() {
     JSON.stringify(toolsConfig, null, 2));
 
   return { npxPath, uvxPath };
+  } catch (error) {
+    console.error('Error finding tool paths:', error);
+    // Set fallback values
+    if (!npxPath) npxPath = isWindows ? 'npx.cmd' : 'npx';
+    if (!uvxPath) uvxPath = isWindows ? 'uvx.cmd' : 'uvx';
+    
+    process.env.DEEBO_NPX_PATH = npxPath;
+    process.env.DEEBO_UVX_PATH = uvxPath;
+    
+    return { npxPath, uvxPath }; // Don't throw - return fallback paths
+  }
 }
-
-const execPromise = promisify(exec);
 
 // Helper to find session directory
 async function findSessionDir(sessionId: string): Promise<string | null> {
@@ -122,11 +138,6 @@ if (!process.env.SCENARIO_MODEL) {
   throw new Error('SCENARIO_MODEL environment variable is required');
 }
 
-
-// Set up basic directories
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-export const DEEBO_ROOT = join(__dirname, '..');
 
 // Create required directories
 await mkdir(join(DEEBO_ROOT, 'memory-bank'), { recursive: true });

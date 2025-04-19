@@ -97,15 +97,21 @@ async function findToolPaths() {
     args: ["@wonderwhy-er/desktop-commander"]
   };
 
-  // Write tools.json with fully resolved paths
+  // Write tools.json with fully resolved paths for the platform
   const toolsConfig = {
     tools: {
       [filesystemToolName]: {
-        command: npxPath,  // Already fully resolved for the platform
-        args: ["@wonderwhy-er/desktop-commander"]
+        // For npm global commands, need to specify what to run if direct path not found
+        command: npxPath,  // Resolved path or 'npx.cmd'/'npx'
+        args: [process.platform === 'win32' ? "npm.cmd" : "npm", "exec", "@wonderwhy-er/desktop-commander"],
+        // Safety backup in case command fails
+        windowsFallback: process.platform === 'win32' ? {
+          command: "npm.cmd",
+          args: ["exec", "@wonderwhy-er/desktop-commander"],
+        } : undefined
       },
       "git-mcp": {
-        command: uvxPath,  // Already fully resolved for the platform
+        command: uvxPath,
         args: ["mcp-server-git", "--repository", "{repoPath}"],
         windowsFallback: {
           command: "python",

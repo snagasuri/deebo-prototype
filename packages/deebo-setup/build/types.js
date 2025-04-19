@@ -1,5 +1,7 @@
 import { z } from 'zod';
+// LLM host validation
 export const LlmHostSchema = z.enum(['openrouter', 'anthropic', 'gemini']);
+// MCP config schema for writing configs
 export const McpConfigSchema = z.object({
     mcpServers: z.record(z.object({
         autoApprove: z.array(z.string()),
@@ -11,4 +13,3 @@ export const McpConfigSchema = z.object({
         transportType: z.string()
     }))
 });
-export const LlmModelSchema = z.string();

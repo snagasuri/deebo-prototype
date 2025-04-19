@@ -174,15 +174,29 @@ export async function updateMcpConfig(config: SetupConfig): Promise<void> {
 
   if (config.claudeConfigPath) {
     try {
-      const claudeConfig: McpConfig = { mcpServers: {} };
+      let claudeConfig: McpConfig = { mcpServers: {} };
       const claudeDir = config.claudeConfigPath.substring(0, config.claudeConfigPath.lastIndexOf(process.platform === 'win32' ? '\\\\' : '/'));
       await mkdir(claudeDir, { recursive: true });
       
+      // Try to read existing config first
+      try {
+        const existingConfig = await readFile(config.claudeConfigPath, 'utf8');
+        claudeConfig = JSON.parse(existingConfig);
+        if (!claudeConfig.mcpServers) {
+          claudeConfig.mcpServers = {};
+        }
+        console.log(chalk.green('✔ Found existing Claude Desktop configuration'));
+      } catch (readError) {
+        // If file doesn't exist or can't be read, use empty config (already set above)
+        console.log(chalk.yellow('Creating new Claude Desktop configuration'));
+      }
+      
+      // Add Deebo to existing or new config
       claudeConfig.mcpServers.deebo = deeboConfig;
       await writeFile(config.claudeConfigPath, JSON.stringify(claudeConfig, null, 2));
-      console.log(chalk.green('✔ Created Claude Desktop configuration'));
+      console.log(chalk.green('✔ Updated Claude Desktop configuration'));
     } catch (error) {
-      console.error(chalk.yellow('⚠ Warning: Could not create Claude Desktop configuration'));
+      console.error(chalk.yellow('⚠ Warning: Could not update Claude Desktop configuration'));
       console.error(chalk.yellow(`Error: ${error instanceof Error ? error.message : String(error)}`));
     }
   }

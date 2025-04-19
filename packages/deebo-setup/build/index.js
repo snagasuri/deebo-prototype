@@ -1,123 +1,39 @@
 #!/usr/bin/env node
-import { homedir } from 'os';
+import { homedir, userInfo } from 'os';
+import { createHash } from 'crypto';
+import https from 'https';
 import { join } from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { LlmHostSchema } from './types.js';
-import { checkPrerequisites, findConfigPaths, setupDeeboDirectory, writeEnvFile, updateMcpConfig, updateAgentConfig, removeProviderConfig, defaultModels } from './utils.js';
-// Parse command line arguments
-const args = process.argv.slice(2);
-const command = args[0];
-if (command === 'providers') {
-    manageProviders().catch(console.error);
-}
-else {
-    main().catch(console.error);
-}
-async function manageProviders() {
+import { checkPrerequisites, findConfigPaths, setupDeeboDirectory, writeEnvFile, updateMcpConfig, defaultModels } from './utils.js';
+// Optional ping for analytics
+async function sendPing() {
     try {
-        process.stdout.write('\u001b[2J\u001b[0;0H'); // Clear console
-        console.log(chalk.blue('==== Deebo Provider Management ====\n'));
-        // Check prerequisites
-        await checkPrerequisites();
-        // Find config paths
-        const configPaths = await findConfigPaths();
-        while (true) {
-            // Get action
-            const { action } = await inquirer.prompt([{
-                    type: 'list',
-                    name: 'action',
-                    message: 'Choose action:',
-                    choices: [
-                        'Configure Mother Agent',
-                        'Configure Scenario Agent',
-                        'Remove Provider',
-                        'Exit'
-                    ]
-                }]);
-            if (action === 'Exit') {
-                process.exit(0);
-            }
-            if (action === 'Remove Provider') {
-                const { host } = await inquirer.prompt([{
-                        type: 'list',
-                        name: 'host',
-                        message: 'Choose provider to remove:',
-                        choices: Object.keys(defaultModels)
-                    }]);
-                const parsedHost = LlmHostSchema.parse(host);
-                await removeProviderConfig(configPaths, parsedHost);
-                console.log(chalk.green('✔ Removed provider configuration'));
-                continue;
-            }
-            // Configure agent
-            const agentType = action === 'Configure Mother Agent' ? 'mother' : 'scenario';
-            let apiKey = '';
-            let isValidKey = false;
-            while (!isValidKey) {
-                const { host } = await inquirer.prompt([{
-                        type: 'list',
-                        name: 'host',
-                        message: `Choose LLM provider for ${agentType} agent:`,
-                        choices: Object.keys(defaultModels)
-                    }]);
-                const parsedHost = LlmHostSchema.parse(host);
-                const { model } = await inquirer.prompt([{
-                        type: 'input',
-                        name: 'model',
-                        message: chalk.dim(`Enter model (default is ${defaultModels[parsedHost].split('/').pop()})`),
-                        default: defaultModels[parsedHost]
-                    }]);
-                const result = await inquirer.prompt([{
-                        type: 'password',
-                        name: 'apiKey',
-                        message: `Enter your ${host.toUpperCase()}_API_KEY:`
-                    }]);
-                apiKey = result.apiKey;
-                // Show API key preview
-                console.log(chalk.dim(`API key preview: ${apiKey.substring(0, 8)}...`));
-                const { confirmKey } = await inquirer.prompt([{
-                        type: 'confirm',
-                        name: 'confirmKey',
-                        message: 'Is this API key correct?',
-                        default: true
-                    }]);
-                if (!confirmKey) {
-                    const { retry } = await inquirer.prompt([{
-                            type: 'confirm',
-                            name: 'retry',
-                            message: 'Would you like to try again?',
-                            default: true
-                        }]);
-                    if (!retry) {
-                        throw new Error('API key confirmation failed. Please try again.');
-                    }
-                    continue;
-                }
-                await updateAgentConfig(configPaths, agentType, parsedHost, model, apiKey);
-                console.log(chalk.green(`✔ Updated ${agentType} agent configuration`));
-                console.log(chalk.blue('\nNext steps:'));
-                console.log('1. Restart your MCP client (Cline/Claude Desktop)');
-                console.log('2. Run npx deebo-doctor to verify the installation');
-                isValidKey = true;
-            }
-        }
+        const hash = createHash("sha256")
+            .update(process.cwd() + userInfo().username)
+            .digest("hex")
+            .slice(0, 12);
+        const req = https.request({
+            method: "POST",
+            hostname: "deebo-active-counter.ramnag2003.workers.dev",
+            path: "/ping",
+            headers: { "content-type": "application/json" }
+        }, res => res.on("data", () => { }));
+        req.on("error", () => { });
+        req.write(JSON.stringify({ hash }));
+        req.end();
     }
-    catch (error) {
-        console.error(chalk.red('\n✖ Provider management failed:'));
-        console.error(error instanceof Error ? error.message : String(error));
-        process.exit(1);
-    }
+    catch (error) { }
 }
 async function main() {
     try {
-        process.stdout.write('\u001b[2J\u001b[0;0H'); // Clear console
-        console.log(chalk.blue('==== Deebo Setup ====\n'));
-        // Check prerequisites
+        process.stdout.write('\\u001b[2J\\u001b[0;0H');
+        console.log(chalk.blue('==== Deebo Setup ====\
+'));
         await checkPrerequisites();
-        // Find config paths
         const configPaths = await findConfigPaths();
-        // Get Mother agent configuration
+        // Get Mother agent config
         const { motherHost } = await inquirer.prompt([{
                 type: 'list',
                 name: 'motherHost',
@@ -131,7 +47,7 @@ async function main() {
                 message: chalk.dim(`Enter model (default is ${defaultModels[parsedMotherHost].split('/').pop()})`),
                 default: defaultModels[parsedMotherHost]
             }]);
-        // Get Scenario agent configuration
+        // Get Scenario agent config
         const { scenarioHost } = await inquirer.prompt([{
                 type: 'list',
                 name: 'scenarioHost',
@@ -149,54 +65,27 @@ async function main() {
         // Get API keys
         let motherApiKey = '';
         let scenarioApiKey = '';
-        let isValidKey = false;
-        while (!isValidKey) {
-            const { apiKey: mKey } = await inquirer.prompt([{
+        const { apiKey: mKey } = await inquirer.prompt([{
+                type: 'password',
+                name: 'apiKey',
+                message: `Enter your ${motherHost.toUpperCase()}_API_KEY:`
+            }]);
+        motherApiKey = mKey;
+        if (scenarioHost !== motherHost) {
+            const { apiKey: sKey } = await inquirer.prompt([{
                     type: 'password',
                     name: 'apiKey',
-                    message: `Enter your ${motherHost.toUpperCase()}_API_KEY:`
+                    message: `Enter your ${scenarioHost.toUpperCase()}_API_KEY:`
                 }]);
-            motherApiKey = mKey;
-            // Show API key preview
-            console.log(chalk.dim(`Mother API key preview: ${motherApiKey.substring(0, 8)}...`));
-            if (scenarioHost !== motherHost) {
-                const { apiKey: sKey } = await inquirer.prompt([{
-                        type: 'password',
-                        name: 'apiKey',
-                        message: `Enter your ${scenarioHost.toUpperCase()}_API_KEY:`
-                    }]);
-                scenarioApiKey = sKey;
-                console.log(chalk.dim(`Scenario API key preview: ${scenarioApiKey.substring(0, 8)}...`));
-            }
-            else {
-                scenarioApiKey = motherApiKey;
-                console.log(chalk.dim(`Using same API key for scenario agent`));
-            }
-            const { confirmKey } = await inquirer.prompt([{
-                    type: 'confirm',
-                    name: 'confirmKey',
-                    message: 'Are these API keys correct?',
-                    default: true
-                }]);
-            if (!confirmKey) {
-                const { retry } = await inquirer.prompt([{
-                        type: 'confirm',
-                        name: 'retry',
-                        message: 'Would you like to try again?',
-                        default: true
-                    }]);
-                if (!retry) {
-                    throw new Error('API key confirmation failed. Please try again.');
-                }
-                continue;
-            }
-            isValidKey = true;
+            scenarioApiKey = sKey;
         }
-        // Setup paths
+        else {
+            scenarioApiKey = motherApiKey;
+        }
+        // Setup paths and config
         const home = homedir();
         const deeboPath = join(home, '.deebo');
         const envPath = join(deeboPath, '.env');
-        // Create config object
         const config = {
             deeboPath,
             envPath,
@@ -209,20 +98,22 @@ async function main() {
             clineConfigPath: configPaths.cline,
             claudeConfigPath: configPaths.claude
         };
-        // Setup Deebo
         await setupDeeboDirectory(config);
         await writeEnvFile(config);
         await updateMcpConfig(config);
-        console.log(chalk.green('\n✔ Deebo installation complete!'));
-        console.log(chalk.blue('\nNext steps:'));
+        await sendPing().catch(() => { });
+        console.log(chalk.green('\
+✔ Deebo installation complete!'));
+        console.log(chalk.blue('\
+Next steps:'));
         console.log('1. Restart your MCP client (Cline/Claude Desktop)');
         console.log('2. Run npx deebo-doctor to verify the installation');
     }
     catch (error) {
-        console.error(chalk.red('\n✖ Installation failed:'));
+        console.error(chalk.red('\
+✖ Installation failed:'));
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
     }
 }
-// In ES modules, we don't need this check
-// The code is already set up to run main() or manageProviders() based on args
+main().catch(console.error);

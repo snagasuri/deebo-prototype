@@ -1,7 +1,7 @@
 // src/util/mcp.ts
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { readFile } from 'fs/promises';
+import { readFile, access } from 'fs/promises';
 import { join } from 'path';
 import { DEEBO_ROOT } from '../index.js';
 import { getProjectId } from './sanitize.js';
@@ -44,36 +44,10 @@ export async function connectMcpTool(name: string, toolName: string, sessionId: 
     const memoryPath = join(DEEBO_ROOT, 'memory-bank', projectId);
     const memoryRoot = join(DEEBO_ROOT, 'memory-bank');
     
-    // Replace placeholders in command with platform-specific handling
-    if (isWindows) {
-      // Try these Windows-specific locations in order
-      let foundPath = '';
-      
-      // 1. Check Program Files
-      const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-      const npmPath = join(programFiles, 'nodejs', 'npx.cmd');
-      if (await access(npmPath).then(() => true).catch(() => false)) {
-        foundPath = npmPath;
-      }
-      
-      // 2. Check AppData if Program Files failed
-      if (!foundPath && process.env.APPDATA) {
-        const roamingNpmPath = join(process.env.APPDATA, 'npm', 'npx.cmd');
-        if (await access(roamingNpmPath).then(() => true).catch(() => false)) {
-          foundPath = roamingNpmPath;
-        }
-      }
-      
-      // Use found path or fallback
-      toolConfig.command = toolConfig.command
-        .replace(/{npxPath}/g, process.env.DEEBO_NPX_PATH || foundPath || 'npx.cmd')
-        .replace(/{uvxPath}/g, process.env.DEEBO_UVX_PATH || 'uvx.cmd');
-    } else {
-      // Mac/Linux handling unchanged
-      toolConfig.command = toolConfig.command
-        .replace(/{npxPath}/g, process.env.DEEBO_NPX_PATH || 'npx')
-        .replace(/{uvxPath}/g, process.env.DEEBO_UVX_PATH || 'uvx');
-    }
+    // Replace placeholders in command
+    toolConfig.command = toolConfig.command
+      .replace(/{npxPath}/g, process.env.DEEBO_NPX_PATH || (process.platform === 'win32' ? 'npx.cmd' : 'npx'))
+      .replace(/{uvxPath}/g, process.env.DEEBO_UVX_PATH || (process.platform === 'win32' ? 'uvx.cmd' : 'uvx'));
 
     // Replace placeholders in arguments  
     toolConfig.args = toolConfig.args.map((arg: string) =>

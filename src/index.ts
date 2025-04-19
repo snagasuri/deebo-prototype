@@ -21,21 +21,38 @@ async function findToolPaths() {
   let uvxPath = '';
   
   try {
-    // Find npx path
-    try {
-      npxPath = (await execPromise(`${findCommand} npx`)).stdout.trim();
-      if (isWindows && npxPath.includes('\r\n')) {
-        // Windows 'where' can return multiple lines, take the first one
-        npxPath = npxPath.split('\r\n')[0].trim();
+    if (isWindows) {
+      // Try each Windows path in order
+      const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+      const appData = process.env.APPDATA;
+      
+      // 1. Program Files
+      const programFilesNpx = join(programFiles, 'nodejs', 'npx.cmd');
+      if (await access(programFilesNpx).then(() => true).catch(() => false)) {
+        npxPath = programFilesNpx;
+      } 
+      // 2. AppData
+      else if (appData) {
+        const appDataNpx = join(appData, 'npm', 'npx.cmd');
+        if (await access(appDataNpx).then(() => true).catch(() => false)) {
+          npxPath = appDataNpx;
+        }
       }
-    } catch (error) {
-      // Fallback for Windows if 'where' fails
-      if (isWindows) {
-        npxPath = 'npx';
-        console.log('Using default npx command');
-      } else {
-        throw error;
+      // 3. Try where command
+      if (!npxPath) {
+        try {
+          npxPath = (await execPromise('where npx')).stdout.split('\r\n')[0].trim();
+          // Verify it doesn't contain VSCode path
+          if (npxPath.toLowerCase().includes('microsoft vs code')) {
+            npxPath = 'npx.cmd'; // Fall back to PATH resolution
+          }
+        } catch {
+          npxPath = 'npx.cmd';
+        }
       }
+    } else {
+      // Mac/Linux
+      npxPath = (await execPromise('which npx')).stdout.trim();
     }
     
     // Find uvx path
@@ -80,20 +97,15 @@ async function findToolPaths() {
     args: ["@wonderwhy-er/desktop-commander"]
   };
 
-  // Write tools.json with platform-specific config
+  // Write tools.json with fully resolved paths
   const toolsConfig = {
     tools: {
-      [filesystemToolName]: process.platform === 'win32' 
-        ? {
-            command: "npx.cmd",  // Windows needs .cmd
-            args: ["@wonderwhy-er/desktop-commander"]
-          }
-        : {
-            command: "npx",
-            args: ["@wonderwhy-er/desktop-commander"]
-          },
+      [filesystemToolName]: {
+        command: npxPath,  // Already fully resolved for the platform
+        args: ["@wonderwhy-er/desktop-commander"]
+      },
       "git-mcp": {
-        command: "{uvxPath}",
+        command: uvxPath,  // Already fully resolved for the platform
         args: ["mcp-server-git", "--repository", "{repoPath}"],
         windowsFallback: {
           command: "python",

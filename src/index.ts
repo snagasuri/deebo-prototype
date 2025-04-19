@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { readFile, mkdir, readdir, access, writeFile } from 'fs/promises';
 import { config } from 'dotenv';
+import { safeLog } from './util/logger.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { runMotherAgent } from './mother-agent.js';
@@ -21,64 +22,11 @@ async function findToolPaths() {
   let uvxPath = '';
   
   try {
-    if (isWindows) {
-      // Try each Windows path in order
-      const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-      const appData = process.env.APPDATA;
-      
-      // 1. Program Files
-      const programFilesNpx = join(programFiles, 'nodejs', 'npx.cmd');
-      if (await access(programFilesNpx).then(() => true).catch(() => false)) {
-        npxPath = programFilesNpx;
-      } 
-      // 2. AppData
-      else if (appData) {
-        const appDataNpx = join(appData, 'npm', 'npx.cmd');
-        if (await access(appDataNpx).then(() => true).catch(() => false)) {
-          npxPath = appDataNpx;
-        }
-      }
-      // 3. Try where command
-      if (!npxPath) {
-        try {
-          npxPath = (await execPromise('where npx')).stdout.split('\r\n')[0].trim();
-          // Verify it doesn't contain VSCode path
-          if (npxPath.toLowerCase().includes('microsoft vs code')) {
-            npxPath = 'npx.cmd'; // Fall back to PATH resolution
-          }
-        } catch {
-          npxPath = 'npx.cmd';
-        }
-      }
-    } else {
-      // Mac/Linux
-      npxPath = (await execPromise('which npx')).stdout.trim();
-    }
+    // Just use command name - Windows needs .cmd
+    npxPath = isWindows ? 'npx.cmd' : 'npx';
     
-    // Find uvx path
-    try {
-      uvxPath = (await execPromise(`${findCommand} uvx`)).stdout.trim();
-      if (isWindows && uvxPath.includes('\r\n')) {
-        // Windows 'where' can return multiple lines, take the first one
-        uvxPath = uvxPath.split('\r\n')[0].trim();
-      }
-    } catch (error) {
-      // On Windows, we may need to fallback to Python module path
-      if (isWindows) {
-        try {
-          // Check if uv is installed via pip
-          await execPromise('pip show uv');
-          uvxPath = 'python -m uv'; // Use Python module path
-          console.log('Using Python module path for uv');
-        } catch (pipError) {
-          // If neither found, use default (which will be handled by the fallback in mcp.ts)
-          uvxPath = 'uvx';
-          console.log('Using default uvx command');
-        }
-      } else {
-        throw error;
-      }
-    }
+    // Similarly for uvx
+    uvxPath = isWindows ? 'uvx.cmd' : 'uvx';
   } catch (error) {
     console.error('Error finding tool paths:', error);
     // Set fallback values if we can't determine paths
@@ -97,18 +45,12 @@ async function findToolPaths() {
     args: ["@wonderwhy-er/desktop-commander"]
   };
 
-  // Write tools.json with fully resolved paths for the platform
+  // Write tools.json
   const toolsConfig = {
     tools: {
       [filesystemToolName]: {
-        // For npm global commands, need to specify what to run if direct path not found
-        command: npxPath,  // Resolved path or 'npx.cmd'/'npx'
-        args: [process.platform === 'win32' ? "npm.cmd" : "npm", "exec", "@wonderwhy-er/desktop-commander"],
-        // Safety backup in case command fails
-        windowsFallback: process.platform === 'win32' ? {
-          command: "npm.cmd",
-          args: ["exec", "@wonderwhy-er/desktop-commander"],
-        } : undefined
+        command: npxPath,  // Will be actual path from where/which
+        args: ["@wonderwhy-er/desktop-commander"]
       },
       "git-mcp": {
         command: uvxPath,

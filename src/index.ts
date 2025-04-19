@@ -3,7 +3,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { readFile, mkdir, readdir, access, writeFile } from 'fs/promises';
 import { config } from 'dotenv';
-import { safeLog } from './util/logger.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { runMotherAgent } from './mother-agent.js';
@@ -14,64 +13,85 @@ import { promisify } from 'util';
 
 // Function to find tool paths during initialization
 async function findToolPaths() {
-  // Use 'where' on Windows, 'which' on other platforms
   const isWindows = process.platform === 'win32';
-  const findCommand = isWindows ? 'where' : 'which';
-  
   let npxPath = '';
   let uvxPath = '';
   
   try {
-    // Just use command name - Windows needs .cmd
-    npxPath = isWindows ? 'npx.cmd' : 'npx';
+    if (isWindows) {
+      // Use cmd.exe explicitly with /C flag to ensure proper environment
+      const { stdout: npxStdout } = await execPromise('cmd.exe /C where npx', { windowsHide: false });
+      if (npxStdout) {
+        // Take the first result from where command (typically the .cmd file)
+        const paths = npxStdout.trim().split('\n');
+        // Prefer .cmd files on Windows
+        const cmdPaths = paths.filter(p => p.endsWith('.cmd'));
+        npxPath = cmdPaths.length > 0 ? cmdPaths[0] : paths[0];
+      } else {
+        npxPath = 'npx.cmd'; // Fallback
+      }
+      
+      // Same approach for uvx
+      const { stdout: uvxStdout } = await execPromise('cmd.exe /C where uvx', { windowsHide: false });
+      if (uvxStdout) {
+        const paths = uvxStdout.trim().split('\n');
+        const cmdPaths = paths.filter(p => p.endsWith('.cmd'));
+        uvxPath = cmdPaths.length > 0 ? cmdPaths[0] : (paths[0] || 'uvx.cmd');
+      } else {
+        uvxPath = 'uvx.cmd'; // Fallback
+      }
+    } else {
+      // Mac/Linux path remains unchanged
+      npxPath = (await execPromise('which npx')).stdout.trim();
+      uvxPath = (await execPromise('which uvx')).stdout.trim();
+    }
     
-    // Similarly for uvx
-    uvxPath = isWindows ? 'uvx.cmd' : 'uvx';
-  } catch (error) {
-    console.error('Error finding tool paths:', error);
-    // Set fallback values if we can't determine paths
-    if (!npxPath) npxPath = 'npx';
-    if (!uvxPath) uvxPath = 'uvx';
-  }
+    // For debugging - log what paths were found
+    console.log(`Found npxPath: ${npxPath}`);
+    console.log(`Found uvxPath: ${uvxPath}`);
+    
+    // Store paths in env for mcp.ts to use
+    process.env.DEEBO_NPX_PATH = npxPath;
+    process.env.DEEBO_UVX_PATH = uvxPath;
 
-  // Store paths in env for mcp.ts to use
-  process.env.DEEBO_NPX_PATH = npxPath;
-  process.env.DEEBO_UVX_PATH = uvxPath;
-
-  // Reverted: Always configure desktopCommander regardless of platform
-  const filesystemToolName = "desktopCommander";
-  const filesystemToolConfig = {
-    command: "{npxPath}", // Assumes npx is found
-    args: ["@wonderwhy-er/desktop-commander"]
-  };
-
-  // Write tools.json
-  const toolsConfig = {
-    tools: {
-      [filesystemToolName]: {
-        command: npxPath,  // Will be actual path from where/which
-        args: ["@wonderwhy-er/desktop-commander"]
-      },
-      "git-mcp": {
-        command: uvxPath,
-        args: ["mcp-server-git", "--repository", "{repoPath}"],
-        windowsFallback: {
-          command: "python",
-          args: [
-            "-m",
-            "mcp_server_git",
-            "--repository",
-            "{repoPath}"
-          ]
+    // Write tools.json
+    const toolsConfig = {
+      tools: {
+        "desktopCommander": {
+          command: npxPath,
+          args: ["@wonderwhy-er/desktop-commander"]
+        },
+        "git-mcp": {
+          command: uvxPath,
+          args: ["mcp-server-git", "--repository", "{repoPath}"],
+          windowsFallback: {
+            command: "python",
+            args: [
+              "-m",
+              "mcp_server_git",
+              "--repository",
+              "{repoPath}"
+            ]
+          }
         }
       }
-    }
-  };
+    };
 
-  await writeFile(join(DEEBO_ROOT, 'config', 'tools.json'), 
-    JSON.stringify(toolsConfig, null, 2));
+    await writeFile(join(DEEBO_ROOT, 'config', 'tools.json'), 
+      JSON.stringify(toolsConfig, null, 2));
 
-  return { npxPath, uvxPath };
+    return { npxPath, uvxPath };
+  } catch (error) {
+    console.error('Error finding tool paths:', error);
+    // Set fallback values
+    if (!npxPath) npxPath = isWindows ? 'npx.cmd' : 'npx';
+    if (!uvxPath) uvxPath = isWindows ? 'uvx.cmd' : 'uvx';
+    
+    process.env.DEEBO_NPX_PATH = npxPath;
+    process.env.DEEBO_UVX_PATH = uvxPath;
+    
+    return { npxPath, uvxPath }; // Don't throw - return fallback paths
+  }
 }
 
 const execPromise = promisify(exec);

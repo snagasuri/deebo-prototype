@@ -12,7 +12,10 @@ on:
 
 jobs:
   basic-test:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     env:
       NODE_ENV: development
@@ -35,15 +38,28 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install ripgrep (macOS)
+      - name: Install ripgrep
+        shell: bash
         run: |
-          brew install ripgrep
-          echo "RIPGREP_PATH=$(which rg)" >> $GITHUB_ENV
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            brew install ripgrep
+            echo "RIPGREP_PATH=$(which rg)" >> $GITHUB_ENV
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            choco install ripgrep
+            echo "RIPGREP_PATH=$(which rg)" >> $GITHUB_ENV
+          fi
 
-      - name: Install uv (macOS)
+      - name: Install uv
+        shell: bash
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            curl.exe -LsSf https://astral.sh/uv/install.ps1 -o install.ps1
+            powershell -ExecutionPolicy Bypass -File install.ps1
+            echo "$USERPROFILE\.cargo\bin" >> $GITHUB_PATH
+          fi
 
       - name: Determine tool paths
         id: tool_paths
@@ -61,40 +77,57 @@ jobs:
           echo "DEEBO_NPM_BIN=${NPM_BIN}" >> $GITHUB_ENV
 
       - name: Install Deebo dependencies
+        shell: bash
         env:
           RIPGREP_PATH: ${{ env.RIPGREP_PATH }}
           NPM_CONFIG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "//api.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "//api.github.com/:_authToken=${GITHUB_TOKEN}" >> "$USERPROFILE/.npmrc"
+          else
+            echo "//api.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+          fi
           npm install --loglevel error --no-optional
 
       - name: Build Deebo
         run: npm run build
 
       - name: Build minimal MCP client
+        shell: bash
         working-directory: ci/mcp-client
         env:
           RIPGREP_PATH: ${{ env.RIPGREP_PATH }}
           NPM_CONFIG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "//api.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "//api.github.com/:_authToken=${GITHUB_TOKEN}" >> "$USERPROFILE/.npmrc"
+          else
+            echo "//api.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+          fi
           npm install --loglevel error --no-optional
           npm run build
 
       - name: Clone task manager fixture repo
         run: |
-          rm -rf task-manager-fixture
+          rm -rf task-manager-fixture || true
           git clone https://github.com/snagasuri/task-manager.git task-manager-fixture
 
       - name: Check OpenRouter API key status
+        shell: bash
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          curl -fsS -G "https://openrouter.ai/api/v1/auth/key" \
-            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
-            -o key_status.json
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            curl.exe -fsS -G "https://openrouter.ai/api/v1/auth/key" \
+              -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+              -o key_status.json
+          else
+            curl -fsS -G "https://openrouter.ai/api/v1/auth/key" \
+              -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+              -o key_status.json
+          fi
           jq -e '.data.label' key_status.json
 
       - name: Run Deebo server and test client (direct tool calls)
@@ -105,7 +138,7 @@ jobs:
           DEEBO_BUILD=$(pwd)/build/index.js
           CLIENT_BUILD=$(pwd)/ci/mcp-client/build/index.js
           FIXTURE=$(pwd)/task-manager-fixture
-          rm -rf memory-bank
+          rm -rf memory-bank || true
 
           echo "Launching Deebo server..."
           node "$DEEBO_BUILD" --once &
@@ -123,8 +156,12 @@ jobs:
           fi
 
           echo "Stopping Deebo server..."
-          kill $SERVER_PID || true
-          wait $SERVER_PID 2>/dev/null || true
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            taskkill //F //PID $SERVER_PID || true
+          else
+            kill $SERVER_PID || true
+            wait $SERVER_PID 2>/dev/null || true
+          fi
 
           SESSION_ID=$(grep 'FINAL_SESSION_ID_MARKER:' client_output.log | cut -d':' -f2)
           SESSION_ID=${SESSION_ID:-$(grep '✅ Started session:' client_output.log | sed 's/✅ Started session: //')}
@@ -134,14 +171,19 @@ jobs:
           echo "SESSION_ID=$SESSION_ID" >> $GITHUB_ENV
 
       - name: Debug logs folder
+        shell: bash
         run: |
           echo "PROJECT_ID=$PROJECT_ID SESSION_ID=$SESSION_ID"
-          ls -R memory-bank/${PROJECT_ID}/sessions/${SESSION_ID}
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            dir /s /b "memory-bank\\${PROJECT_ID}\\sessions\\${SESSION_ID}"
+          else
+            ls -R memory-bank/${PROJECT_ID}/sessions/${SESSION_ID}
+          fi
 
       - name: Upload session logs
         uses: actions/upload-artifact@v4
         with:
           name: session-logs
-          path: memory-bank/${{ env.PROJECT_ID }}/sessions/${{ env.SESSION_ID }}/logs/
+          path: memory-bank/${{ env.PROJECT_ID }}/sessions/${{ env.SESSION_ID }}/logs
           if-no-files-found: error
           retention-days: 7

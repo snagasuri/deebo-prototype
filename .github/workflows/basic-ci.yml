@@ -15,6 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
+      fail-fast: false
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     env:
@@ -45,9 +46,12 @@ jobs:
             brew install ripgrep
             echo "RIPGREP_PATH=$(which rg)" >> $GITHUB_ENV
           elif [ "$RUNNER_OS" == "Windows" ]; then
-            choco install ripgrep
+            choco install -y ripgrep
             echo "RIPGREP_PATH=$(which rg)" >> $GITHUB_ENV
           fi
+          # Validate installation
+          echo "Validating ripgrep installation..."
+          rg --version || { echo "ripgrep installation failed"; exit 1; }
 
       - name: Install uv
         shell: bash
@@ -60,6 +64,9 @@ jobs:
             powershell -ExecutionPolicy Bypass -File install.ps1
             echo "$USERPROFILE\.cargo\bin" >> $GITHUB_PATH
           fi
+          # Validate installation
+          echo "Validating uv installation..."
+          uv --version || { echo "uv installation failed"; exit 1; }
 
       - name: Determine tool paths
         id: tool_paths
@@ -133,6 +140,8 @@ jobs:
       - name: Run Deebo server and test client (direct tool calls)
         id: deebo_run
         shell: bash
+        env:
+          DEEBO_LOG_LEVEL: debug # Enable detailed logging
         run: |
           set -e
           DEEBO_BUILD=$(pwd)/build/index.js
@@ -157,9 +166,15 @@ jobs:
 
           echo "Stopping Deebo server..."
           if [ "$RUNNER_OS" == "Windows" ]; then
-            taskkill //F //PID $SERVER_PID || true
+            # Try graceful termination first
+            taskkill /PID $SERVER_PID 2>/dev/null || true
+            sleep 2
+            # Force kill if still running
+            taskkill /F /PID $SERVER_PID 2>/dev/null || true
           else
-            kill $SERVER_PID || true
+            kill -TERM $SERVER_PID 2>/dev/null || true
+            sleep 2
+            kill -KILL $SERVER_PID 2>/dev/null || true
             wait $SERVER_PID 2>/dev/null || true
           fi
 
@@ -174,9 +189,17 @@ jobs:
         shell: bash
         run: |
           echo "PROJECT_ID=$PROJECT_ID SESSION_ID=$SESSION_ID"
+          echo "Platform: $RUNNER_OS"
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          
           if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "Windows-specific debug info:"
+            systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
             dir /s /b "memory-bank\\${PROJECT_ID}\\sessions\\${SESSION_ID}"
           else
+            echo "Unix-specific debug info:"
+            uname -a
             ls -R memory-bank/${PROJECT_ID}/sessions/${SESSION_ID}
           fi
 

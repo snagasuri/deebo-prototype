@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/snagasuri-deebo-prototype-badge.png)](https://mseep.ai/app/snagasuri-deebo-prototype)
+
 # Deebo: Your AI Agent's Debugging Copilot
 [![CI Status](https://github.com/snagasuri/deebo-prototype/actions/workflows/basic-ci.yml/badge.svg)](https://github.com/snagasuri/deebo-prototype/actions/workflows/basic-ci.yml)
 [![npm version](https://img.shields.io/npm/v/deebo-setup.svg)](https://www.npmjs.com/package/deebo-setup)

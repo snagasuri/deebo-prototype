@@ -1,6 +1,6 @@
 {
   "name": "deebo-doctor",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "Health check tool for Deebo debugging system",
   "type": "module",
   "bin": {

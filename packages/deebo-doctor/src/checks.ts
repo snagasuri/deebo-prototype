@@ -547,24 +547,6 @@ export const guideServerCheck: SystemCheck = {
           continue;
         }
 
-        // Check for required ES module flags
-        const requiredFlags = [
-          '--experimental-specifier-resolution=node',
-          '--experimental-modules',
-          '--es-module-specifier-resolution=node'
-        ];
-        const missingFlags = requiredFlags.filter(flag => !guideServer.args.includes(flag));
-
-        if (missingFlags.length > 0) {
-          results.push({
-            name: `${name}_config`,
-            status: 'fail',
-            message: `Guide server missing required ES module flags in ${name}`,
-            details: `Path: ${path}\nMissing flags: ${missingFlags.join(', ')}`
-          });
-          continue;
-        }
-
         results.push({
           name: `${name}_config`,
           status: 'pass',

@@ -133,7 +133,7 @@ server.tool("start", "Begins an autonomous debugging session that investigates s
         content: [{
                 type: "text",
                 text: `Session ${sessionId} started!\n\n` +
-                    `Check out the GitHub for tips and best practices:\n` +
+                    `Looking for resources? Ask your agent to read Deebo guide, or check out the Deebo GitHub:\n` +
                     `https://github.com/snagasuri/deebo-prototype\n\n` +
                     `Reminder: Deebo updates frequently.\n` +
                     `Run npx deebo-setup@latest or pull the latest from GitHub occasionally to get bug fixes and improvements!`
@@ -172,33 +172,6 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
             return { content: [{ type: "text", text: hintText + 'Session initializing' }] };
         const firstEvent = JSON.parse(motherLines[0]);
         const durationMs = Date.now() - new Date(firstEvent.timestamp).getTime();
-        // Add atomic log reading function
-        const readLogAtomically = async (logPath, maxRetries = 3) => {
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const content = await readFile(logPath, 'utf8');
-                    // Verify log entry completeness by checking for valid JSON and tags
-                    const lines = content.split('\n').filter(Boolean);
-                    if (lines.every(line => {
-                        try {
-                            JSON.parse(line);
-                            return true;
-                        }
-                        catch {
-                            return false;
-                        }
-                    })) {
-                        return content;
-                    }
-                }
-                catch (e) {
-                    if (i === maxRetries - 1)
-                        throw e;
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-            }
-            throw new Error('Failed to read log atomically');
-        };
         // Determine status by scanning for solution tag, cancellation, or errors
         let status = 'in_progress';
         let lastValidEvent = null;
@@ -300,8 +273,8 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
         const normalizedPath = sessionDir.split(path.sep).join('/'); // Normalize to forward slashes
         const projectId = normalizedPath.split("/memory-bank/")[1].split("/")[0];
         const progressMdPath = path.resolve(join(DEEBO_ROOT, "memory-bank", projectId, "progress.md"));
-        const progressLink = `file://${progressMdPath}`;
-        const motherLink = `file://${path.resolve(motherLogPath)}`;
+        const progressLink = `${progressMdPath}`;
+        const motherLink = `${path.resolve(motherLogPath)}`;
         // Build the pulse
         let pulse = hintText;
         pulse += `=== Deebo Session Pulse: ${sessionId} ===\n`;
@@ -311,9 +284,9 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
         pulse += `--- Mother Agent ---\n`;
         pulse += `Status: ${status === 'in_progress' ? 'working' : status}\n`;
         pulse += `Last Activity: ${lastValidEvent ? lastValidEvent.timestamp : 'N/A'}\n`;
-        pulse += `Progress Log: ${progressLink}\n`;
+        pulse += `Mother Log: ${motherLink}\n`;
         if (status === 'completed') {
-            pulse += `Mother Log: ${motherLink}\n\n`;
+            pulse += `Progress Log: ${progressLink}\n\n`;
             if (solutionContent) {
                 pulse += `MOTHER SOLUTION:\n`;
                 pulse += `<<<<<<< SOLUTION\n`;
@@ -414,7 +387,7 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
                     pulse += `  Error reading report: ${error.message}\n`;
                 }
             }
-            pulse += `  (Full report: file://${path.resolve(join(reportsDir, `${scenarioId}.json`))})\n\n`;
+            pulse += `  Full report: ${path.resolve(join(reportsDir, `${scenarioId}.json`))}\n\n`;
         }
         // Process unreported scenarios (either running or terminated without report)
         const unreportedScenarios = scenarioLogs
@@ -458,7 +431,7 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
                 pulse += `  Hypothesis: "${hypothesis}"\n`;
                 pulse += `  Runtime: ${runtime}s\n`;
                 pulse += `  Latest Activity: ${lastEvent.message}\n`;
-                pulse += `  (Log: file://${path.resolve(join(logsDir, file))})\n\n`;
+                pulse += `  Log: ${path.resolve(join(logsDir, file))}\n\n`;
             }
             catch (e) {
                 // Skip scenarios with invalid JSON
@@ -470,7 +443,7 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
             pulse += `\n=======================================\n`;
             pulse += `Not the result you were looking for?\n`;
             pulse += `Start another session and guide Deebo with what you learned!\n`;
-            pulse += `Need a refresher? Check out the Deebo GitHub:\n`;
+            pulse += `Need a refresher? Ask your agent to read Deebo Guide, or check out the GitHub:\n`;
             pulse += `https://github.com/snagasuri/deebo-prototype\n`;
             pulse += `=======================================\n`;
         }

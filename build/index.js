@@ -136,7 +136,7 @@ server.tool("start", "Begins an autonomous debugging session that investigates s
                     `Looking for resources? Ask your agent to read Deebo guide, or check out the Deebo GitHub:\n` +
                     `https://github.com/snagasuri/deebo-prototype\n\n` +
                     `Reminder: Deebo updates frequently.\n` +
-                    `Run npx deebo-setup@latest or pull the latest from GitHub occasionally to get bug fixes and improvements!`
+                    `Run npx deebo-setup@latest frequently for bug fixes and improvements!`
             }]
     };
 });
@@ -246,7 +246,7 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
             const pid = pidMapping.get(scenarioId);
             if (!pid)
                 return 'Unknown';
-            return terminatedPids.has(pid) ? 'Terminated' : 'Running';
+            return terminatedPids.has(pid) ? 'Terminated' : 'Investigating...';
         }
         // Build PID mapping from mother log
         const pidMapping = buildScenarioPIDMapping(motherLines);
@@ -269,7 +269,7 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
                 runningCount++;
             }
         }
-        // build clickable links with absolute paths
+        // build links with absolute paths
         const normalizedPath = sessionDir.split(path.sep).join('/'); // Normalize to forward slashes
         const projectId = normalizedPath.split("/memory-bank/")[1].split("/")[0];
         const progressMdPath = path.resolve(join(DEEBO_ROOT, "memory-bank", projectId, "progress.md"));
@@ -283,10 +283,19 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
         pulse += `Session Duration: ${Math.floor(durationMs / 1000)}s\n\n`;
         pulse += `--- Mother Agent ---\n`;
         pulse += `Status: ${status === 'in_progress' ? 'working' : status}\n`;
-        pulse += `Last Activity: ${lastValidEvent ? lastValidEvent.timestamp : 'N/A'}\n`;
-        pulse += `Mother Log: ${motherLink}\n`;
+        // Calculate time elapsed for last activity
+        const lastActivityTime = lastValidEvent ? Math.floor((Date.now() - new Date(lastValidEvent.timestamp).getTime()) / 1000) : 0;
+        const lastActivityMinutes = Math.floor(lastActivityTime / 60);
+        const lastActivitySeconds = lastActivityTime % 60;
+        const lastActivityStr = lastValidEvent
+            ? lastActivityMinutes > 0
+                ? `${lastActivityMinutes} minute${lastActivityMinutes > 1 ? 's' : ''} ${lastActivitySeconds} second${lastActivitySeconds !== 1 ? 's' : ''} ago`
+                : `${lastActivitySeconds} second${lastActivitySeconds !== 1 ? 's' : ''} ago`
+            : 'N/A';
+        pulse += `Last Activity: ${lastActivityStr}\n`;
+        pulse += `${motherLink}\n`;
         if (status === 'completed') {
-            pulse += `Progress Log: ${progressLink}\n\n`;
+            //pulse += `Solutions log: ${progressLink}\n\n`;
             if (solutionContent) {
                 pulse += `MOTHER SOLUTION:\n`;
                 pulse += `<<<<<<< SOLUTION\n`;
@@ -342,8 +351,16 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
                     continue;
                 }
             }
-            pulse += `* Scenario: ${scenarioId}\n`;
-            pulse += `  Status: Reported\n`;
+            // For reported scenarios, calculate runtime until report time
+            const firstEvent = JSON.parse(scenarioLines[0]);
+            const lastEvent = JSON.parse(scenarioLines[scenarioLines.length - 1]);
+            const runtimeSeconds = Math.floor((new Date(lastEvent.timestamp).getTime() - new Date(firstEvent.timestamp).getTime()) / 1000);
+            const minutes = Math.floor(runtimeSeconds / 60);
+            const seconds = runtimeSeconds % 60;
+            const runtimeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            pulse += `* ${scenarioId} [${runtimeStr}]\n`;
+            pulse += `  Reported\n`;
+            pulse += `  "${hypothesis}"\n`;
             if (status === 'completed') {
                 // Show summary for completed scenarios in completed sessions
                 try {
@@ -380,14 +397,14 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
                         pulse += `  INVESTIGATION:\n`;
                         pulse += `  ${investigationLines.join('\n  ')}\n`;
                     }
-                    pulse += `  ======= OUTCOME ${scenarioId} END >>>>>>>\n`;
                 }
                 catch (e) {
                     const error = e;
                     pulse += `  Error reading report: ${error.message}\n`;
                 }
             }
-            pulse += `  Full report: ${path.resolve(join(reportsDir, `${scenarioId}.json`))}\n\n`;
+            pulse += `  --------------------------------------------------------------\n`;
+            pulse += `  ${path.resolve(join(reportsDir, `${scenarioId}.json`))}\n\n`;
         }
         // Process unreported scenarios (either running or terminated without report)
         const unreportedScenarios = scenarioLogs
@@ -424,14 +441,17 @@ server.tool("check", "Retrieves the current status of a debugging session, provi
                         continue;
                     }
                 }
-                // Calculate runtime and add to pulse
-                const runtime = Math.floor((Date.now() - new Date(firstEvent.timestamp).getTime()) / 1000);
-                pulse += `* Scenario: ${scenarioId}\n`;
-                pulse += `  Status: ${getScenarioStatus(scenarioId, pidMapping)}\n`;
-                pulse += `  Hypothesis: "${hypothesis}"\n`;
-                pulse += `  Runtime: ${runtime}s\n`;
+                // Calculate runtime in MM:SS format
+                const runtimeSeconds = Math.floor((Date.now() - new Date(firstEvent.timestamp).getTime()) / 1000);
+                const minutes = Math.floor(runtimeSeconds / 60);
+                const seconds = runtimeSeconds % 60;
+                const runtimeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                pulse += `* ${scenarioId} [${runtimeStr}]\n`;
+                pulse += `  Investigating...\n`;
+                pulse += `  "${hypothesis}"\n`;
                 pulse += `  Latest Activity: ${lastEvent.message}\n`;
-                pulse += `  Log: ${path.resolve(join(logsDir, file))}\n\n`;
+                pulse += `  --------------------------------------------------------------\n`;
+                pulse += `  ${path.resolve(join(logsDir, file))}\n\n`;
             }
             catch (e) {
                 // Skip scenarios with invalid JSON

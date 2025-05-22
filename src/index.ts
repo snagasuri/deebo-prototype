@@ -359,7 +359,6 @@ server.tool(
       if (status === 'completed') {
         //pulse += `Solutions log: ${progressLink}\n\n`;
         if (solutionContent) {
-          pulse += `MOTHER SOLUTION:\n`;
           pulse += `<<<<<<< SOLUTION\n`;
           pulse += solutionContent + '\n';
           pulse += `======= SOLUTION END >>>>>>>\n\n`;
@@ -421,8 +420,12 @@ server.tool(
         const runtimeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
         pulse += `* ${scenarioId} [${runtimeStr}]\n`;
-        pulse += `  Reported\n`;
-        pulse += `  "${hypothesis}"\n`;
+        pulse += `  ${status === 'completed' ? (reportFiles.includes(`${scenarioId}.json`) ? 'Reported' : 'Crashed') : 'Reported'}\n`;
+        if (status !== 'completed') {
+          // Extract just the description part after any title
+          const descriptionPart = hypothesis.split('\n').slice(1).join('\n').trim() || hypothesis;
+          pulse += `  ${descriptionPart}\n`;
+        }
 
         if (status === 'completed') {
           // Show summary for completed scenarios in completed sessions
@@ -456,7 +459,6 @@ server.tool(
               }
             }
             
-            pulse += `  Outcome Summary:\n`;
             pulse += `  <<<<<<< OUTCOME ${scenarioId}\n`;
             pulse += `  HYPOTHESIS: ${hypothesis}\n\n`;
             pulse += `  CONFIRMED: ${confirmed}\n\n`;
@@ -470,7 +472,7 @@ server.tool(
           }
         }
 
-        pulse += `  --------------------------------------------------------------\n`;
+        pulse += `  ---------------------------------------------------------------------------\n`;
         pulse += `  ${path.resolve(join(reportsDir, `${scenarioId}.json`))}\n\n`;
       }
 
@@ -518,10 +520,14 @@ server.tool(
           const runtimeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
           pulse += `* ${scenarioId} [${runtimeStr}]\n`;
-          pulse += `  Investigating...\n`;
-          pulse += `  "${hypothesis}"\n`;
+          pulse += `  ${status === 'completed' ? 'Crashed' : 'Investigating...'}\n`;
+          // Extract just the description part after any title
+          const descriptionPart = hypothesis.split('\n').slice(1).join('\n').trim() || hypothesis;
+          if (status !== 'completed') {
+            pulse += `  ${descriptionPart}\n`;
+          }
           pulse += `  Latest Activity: ${lastEvent.message}\n`;
-          pulse += `  --------------------------------------------------------------\n`;
+          pulse += `  ---------------------------------------------------------------------------\n`;
           pulse += `  ${path.resolve(join(logsDir, file))}\n\n`;
         } catch (e) {
           // Skip scenarios with invalid JSON

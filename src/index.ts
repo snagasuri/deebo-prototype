@@ -183,7 +183,7 @@ server.tool(
 // Register check tool - gets status of a debug session
 server.tool(
   "check",
-  "Retrieves the current status of a debugging session, providing a detailed pulse report. For in-progress sessions, the pulse includes the mother agent's current stage in the OODA loop, running scenario agents with their hypotheses, and any preliminary findings. For completed sessions, the pulse contains the final solution with a comprehensive explanation, relevant code changes, and outcome summaries from all scenario agents that contributed to the solution. Use this tool to monitor ongoing progress or retrieve the final validated fix.",
+  "Retrieves the current status of a debugging session, providing a detailed pulse report. For in-progress sessions, the pulse includes the mother agent's current stage in the OODA loop, running scenario agents with their hypotheses, and any preliminary findings. For completed sessions, the pulse contains the final solution with a comprehensive explanation, relevant code changes, and outcome summaries from all scenario agents that contributed to the solution. Use this tool to monitor ongoing progress or retrieve the final validated fix. In a short paragraph, Include the Mother agents status only if it's crashed or failing otherwise just skip over it and use the last activity and the last log message to summarize in one sentence what the mother agent did. Then describe scenario agents activity and hypotheses briefly ",
   {
     sessionId: z.string().describe("The session ID returned by the start tool when the debugging session was initiated")
   },
@@ -219,6 +219,12 @@ server.tool(
 
       const firstEvent = JSON.parse(motherLines[0]);
       const durationMs = Date.now() - new Date(firstEvent.timestamp).getTime();
+      const durationSeconds = Math.floor(durationMs / 1000);
+      const durationMinutes = Math.floor(durationSeconds / 60);
+      const remainingSeconds = durationSeconds % 60;
+      const durationStr = durationMinutes > 0
+        ? `${durationMinutes} minute${durationMinutes > 1 ? 's' : ''} ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`
+        : `${durationSeconds} second${durationSeconds !== 1 ? 's' : ''}`;
 
       // Determine status by scanning for solution tag, cancellation, or errors
       let status = 'in_progress';
@@ -338,9 +344,23 @@ server.tool(
       // Build the pulse
       let pulse = hintText;
       pulse += `=== Deebo Session Pulse: ${sessionId} ===\n`;
-      pulse += `Timestamp: ${new Date().toISOString()}\n`;
+      
+      // Replace the timestamp line with formatted date
+      const now = new Date();
+      const formattedDate = now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric', 
+        year: 'numeric'
+      });
+      const formattedTime = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }).toLowerCase();
+      
+      pulse += `${formattedDate} | ${formattedTime}\n`;
       pulse += `Overall Status: ${status}\n`;
-      pulse += `Session Duration: ${Math.floor(durationMs / 1000)}s\n\n`;
+      pulse += `Session Duration: ${durationStr}\n\n`;
 
       pulse += `--- Mother Agent ---\n`;
       pulse += `Status: ${status === 'in_progress' ? 'working' : status}\n`;
@@ -422,9 +442,8 @@ server.tool(
         pulse += `* ${scenarioId} [${runtimeStr}]\n`;
         pulse += `  ${status === 'completed' ? (reportFiles.includes(`${scenarioId}.json`) ? 'Reported' : 'Crashed') : 'Reported'}\n`;
         if (status !== 'completed') {
-          // Extract just the description part after any title
-          const descriptionPart = hypothesis.split('\n').slice(1).join('\n').trim() || hypothesis;
-          pulse += `  ${descriptionPart}\n`;
+          // Show the full hypothesis text, matching completed output
+          pulse += `  HYPOTHESIS: ${hypothesis}\n\n`;
         }
 
         if (status === 'completed') {
@@ -521,11 +540,8 @@ server.tool(
 
           pulse += `* ${scenarioId} [${runtimeStr}]\n`;
           pulse += `  ${status === 'completed' ? 'Crashed' : 'Investigating...'}\n`;
-          // Extract just the description part after any title
-          const descriptionPart = hypothesis.split('\n').slice(1).join('\n').trim() || hypothesis;
-          if (status !== 'completed') {
-            pulse += `  ${descriptionPart}\n`;
-          }
+          // Show the full hypothesis text
+          pulse += `  HYPOTHESIS: ${hypothesis}\n\n`;
           pulse += `  Latest Activity: ${lastEvent.message}\n`;
           pulse += `  ---------------------------------------------------------------------------\n`;
           pulse += `  ${path.resolve(join(logsDir, file))}\n\n`;

@@ -1,0 +1,152 @@
+name: Deebo Windows CI
+
+on:
+  push:
+    branches:
+      - master
+      - fix-ci-env-vars
+      - test-windows-ci
+  pull_request:
+    branches:
+      - master
+      - fix-ci-env-vars
+      - test-windows-ci
+
+jobs:
+  basic-test:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: development
+      USE_MEMORY_BANK: "true"
+      MOTHER_HOST: openrouter
+      MOTHER_MODEL: anthropic/claude-3.5-sonnet
+      SCENARIO_HOST: openrouter
+      SCENARIO_MODEL: deepseek/deepseek-chat
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+    steps:
+      - name: Checkout Deebo code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install ripgrep (Windows)
+        run: |
+          choco install ripgrep -y
+          echo "RIPGREP_PATH=C:\ProgramData\chocolatey\bin\rg.exe" >> $env:GITHUB_ENV
+
+      - name: Install uv (Windows)
+        run: |
+          iwr https://astral.sh/uv/install.ps1 -useb | iex
+          echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
+
+      - name: Determine tool paths
+        id: tool_paths
+        shell: pwsh
+        run: |
+          function Find-Command {
+            param($cmd)
+            (Get-Command $cmd).Path
+          }
+          $NPX_PATH = Find-Command "npx"
+          $UVX_PATH = Find-Command "uvx"
+          $NPM_BIN = Split-Path $NPX_PATH
+          echo "DEEBO_NPX_PATH=$NPX_PATH" >> $env:GITHUB_ENV
+          echo "DEEBO_UVX_PATH=$UVX_PATH" >> $env:GITHUB_ENV 
+          echo "DEEBO_NPM_BIN=$NPM_BIN" >> $env:GITHUB_ENV
+
+      - name: Install Deebo dependencies
+        env:
+          RIPGREP_PATH: ${{ env.RIPGREP_PATH }}
+          NPM_CONFIG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "//api.github.com/:_authToken=$env:GITHUB_TOKEN" >> "$env:USERPROFILE\.npmrc"
+          npm install --loglevel error --no-optional
+
+      - name: Build Deebo
+        run: npm run build
+
+      - name: Build minimal MCP client
+        working-directory: ci/mcp-client
+        env:
+          RIPGREP_PATH: ${{ env.RIPGREP_PATH }}
+          NPM_CONFIG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "//api.github.com/:_authToken=$env:GITHUB_TOKEN" >> "$env:USERPROFILE\.npmrc"
+          npm install --loglevel error --no-optional
+          npm run build
+
+      - name: Clone task manager fixture repo
+        shell: pwsh
+        run: |
+          if (Test-Path task-manager-fixture) { Remove-Item -Recurse -Force task-manager-fixture }
+          git clone https://github.com/snagasuri/task-manager.git task-manager-fixture
+
+      - name: Check OpenRouter API key status
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        shell: pwsh
+        run: |
+          $response = Invoke-RestMethod -Uri "https://openrouter.ai/api/v1/auth/key" -Headers @{
+            "Authorization" = "Bearer $env:OPENROUTER_API_KEY"
+          }
+          $response.data.label
+
+      - name: Run Deebo server and test client
+        id: deebo_run
+        shell: pwsh
+        run: |
+          $DEEBO_BUILD = Join-Path $PWD "build\index.js"
+          $CLIENT_BUILD = Join-Path $PWD "ci\mcp-client\build\index.js"
+          $FIXTURE = Join-Path $PWD "task-manager-fixture"
+          if (Test-Path memory-bank) { Remove-Item -Recurse -Force memory-bank }
+
+          Write-Host "Launching Deebo server..."
+          $serverJob = Start-Job { param($path) node $path --once } -ArgumentList $DEEBO_BUILD
+          Start-Sleep -Seconds 2
+
+          Write-Host "Running client against server..."
+          node $CLIENT_BUILD $DEEBO_BUILD $FIXTURE | Tee-Object -FilePath client_output.log
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Client failed with code $LASTEXITCODE"
+            Stop-Job $serverJob
+            exit $LASTEXITCODE
+          }
+
+          Write-Host "Stopping Deebo server..."
+          Stop-Job $serverJob
+          Remove-Job $serverJob
+
+          $SESSION_ID = Select-String -Path client_output.log -Pattern 'FINAL_SESSION_ID_MARKER:' | 
+            ForEach-Object { $_.Line.Split(':')[1] }
+          if (-not $SESSION_ID) {
+            $SESSION_ID = Select-String -Path client_output.log -Pattern '✅ Started session: ' |
+              ForEach-Object { $_.Line.Replace('✅ Started session: ', '') }
+          }
+          $PROJECT_ID = node --experimental-specifier-resolution=node ci/get-project-id.js $FIXTURE
+
+          echo "PROJECT_ID=$PROJECT_ID" >> $env:GITHUB_ENV
+          echo "SESSION_ID=$SESSION_ID" >> $env:GITHUB_ENV
+
+      - name: Debug logs folder
+        shell: pwsh
+        run: |
+          Write-Host "PROJECT_ID=$env:PROJECT_ID SESSION_ID=$env:SESSION_ID"
+          Get-ChildItem -Recurse "memory-bank\$env:PROJECT_ID\sessions\$env:SESSION_ID"
+
+      - name: Upload session logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-logs
+          path: memory-bank/${{ env.PROJECT_ID }}/sessions/${{ env.SESSION_ID }}/logs/
+          if-no-files-found: error
+          retention-days: 7

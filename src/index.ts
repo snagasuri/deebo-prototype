@@ -15,10 +15,17 @@ import { homedir } from "node:os";
 
 const execPromise = promisify(exec);
 
-function winRoamingBin(): string {
+async function winRoamingBin(): Promise<string> {
   // VS Code spawns MCP servers with a clean env (no APPDATA)
-  const base = process.env.APPDATA ?? path.join(homedir(), "AppData", "Roaming");
-  return path.join(base, "npm");
+  // Use actual npm prefix instead of assuming %APPDATA%\npm for nvm compatibility
+  try {
+    const result = await execPromise('npm config get prefix');
+    return result.stdout.trim();
+  } catch {
+    // Fallback to traditional roaming path if npm command fails
+    const base = process.env.APPDATA ?? path.join(homedir(), "AppData", "Roaming");
+    return path.join(base, "npm");
+  }
 }
 
 // Function to find tool paths during initialization
@@ -30,10 +37,14 @@ async function findToolPaths() {
   if (isWindows) {
     try {
       const npxPaths = (await execPromise('cmd.exe /c where npx.cmd')).stdout.trim().split('\n');
-      // Favor Program Files to get direct executable
-      const foundNpxPath = npxPaths.find(p => p.includes('Program Files'));
+      // Prefer Program Files, but fallback to any valid npx.cmd path for nvm compatibility
+      let foundNpxPath = npxPaths.find(p => p.includes('Program Files'));
       if (!foundNpxPath) {
-        throw new Error('Could not find npx.cmd in Program Files');
+        // Fallback to the first available npx.cmd path (supports nvm installations)
+        foundNpxPath = npxPaths[0];
+        if (!foundNpxPath) {
+          throw new Error('Could not find npx.cmd in any location');
+        }
       }
       npxPath = path.normalize(foundNpxPath).trim();
 
@@ -52,7 +63,7 @@ async function findToolPaths() {
 
   // Get npm bin directory for Windows desktop-commander.cmd
   const npmBin = isWindows
-    ? winRoamingBin()                                  // Use homedir() when VS Code strips env
+    ? await winRoamingBin()                            // Use actual npm prefix for nvm compatibility
     : path.dirname(npxPath);                           // same folder as npx on *nix
 
   process.env.DEEBO_NPM_BIN = npmBin;                 // <-- expose for later

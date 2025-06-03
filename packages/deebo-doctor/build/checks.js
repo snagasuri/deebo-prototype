@@ -2,6 +2,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { access, readFile } from 'fs/promises';
 import { simpleGit as createGit } from 'simple-git';
+import { execSync } from 'child_process';
 export const nodeVersionCheck = {
     name: 'Node.js Version',
     async check() {
@@ -68,8 +69,17 @@ export const mcpToolsCheck = {
         // Check desktop-commander
         if (process.platform === 'win32') {
             // On Windows, check for the .cmd shim which is required for proper stdin/stdout handling
-            const base = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming');
-            const cmdPath = join(base, 'npm', 'desktop-commander.cmd');
+            // Use actual npm prefix instead of assuming %APPDATA%\npm for nvm compatibility
+            let cmdPath;
+            try {
+                const npmPrefix = execSync('npm config get prefix').toString().trim();
+                cmdPath = join(npmPrefix, 'desktop-commander.cmd');
+            }
+            catch {
+                // Fallback to traditional roaming path if npm command fails
+                const base = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming');
+                cmdPath = join(base, 'npm', 'desktop-commander.cmd');
+            }
             try {
                 await access(cmdPath);
                 results.push({

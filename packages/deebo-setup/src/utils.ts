@@ -476,18 +476,23 @@ export async function updateMcpConfig(config: SetupConfig): Promise<{ fullConfig
         // File doesn't exist or is empty, use empty object
       }
 
-      // Add MCP settings
-      const mcpSettings = settings as Record<string, any>;
-      mcpSettings.mcp = mcpSettings.mcp || {};
-      mcpSettings.mcp.servers = mcpSettings.mcp.servers || {};
-      mcpSettings.mcp.servers.deebo = serverConfig;
-      mcpSettings['chat.mcp.enabled'] = true;
+      // Add MCP settings while preserving existing settings
+      const existingSettings = settings as Record<string, any>;
+      existingSettings.mcp = existingSettings.mcp || {};
+      existingSettings.mcp.servers = existingSettings.mcp.servers || {};
+      existingSettings.mcp.servers.deebo = serverConfig;
+      existingSettings['chat.mcp.enabled'] = true;
+
+      // Write settings file with merged settings
+      const mergedSettings = {
+        ...existingSettings
+      };
 
       // Create parent directory if it doesn't exist
       await mkdir(dirname(config.vscodePath), { recursive: true });
 
-      // Write settings file
-      await writeFile(config.vscodePath, JSON.stringify(mcpSettings, null, 2));
+      // Write settings file with merged settings
+      await writeFile(config.vscodePath, JSON.stringify(mergedSettings, null, 2));
       console.log(chalk.green('✔ Updated VS Code settings'));
       console.log(chalk.dim(`  Settings file: ${config.vscodePath}`));
     } catch (err) {

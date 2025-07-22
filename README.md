@@ -3,13 +3,16 @@
 [![npm version](https://img.shields.io/npm/v/deebo-setup.svg)](https://www.npmjs.com/package/deebo-setup)
 [![GitHub stars](https://img.shields.io/github/stars/snagasuri/deebo-prototype?style=social)](https://github.com/snagasuri/deebo-prototype)
 
+**[www.bojack.ai](https://www.bojack.ai) From the creators of Deebo.**
+
+**Bojack is a unified, AI-native DevOps platform based in the browser and terminal. No more dashboards, just answers.**
+
+
+**Deebo is not maintained actively. Install at your own risk.**
 Deebo is an agentic debugging copilot for your AI coding agent that speeds up time-to-resolution by 10x. If your main coding agent is like a single-threaded process, Deebo introduces multi-threadedness to your development workflow.
 
-**feedback, questions/support? check out Deebo Guide below, or dm me on x @sriramenn**
-
-**If you think your team can benefit from Deebo, we’d love to hear from you.** We’re partnering with teams who use AI agents to write production code and want to maximize their productivity. Reach out for a live walkthrough, custom setup support, or to explore early access to enterprise features.
-
-## Quick Install
+As seen on [PulseMCP](https://www.pulsemcp.com/servers/snagasuri-deebo), [@cline on X](https://x.com/cline/status/1915088556852453831), and the [official MCP directory](https://github.com/modelcontextprotocol/servers).
+## Quick Install (legacy)
 
 ```bash
 npx deebo-setup@latest
